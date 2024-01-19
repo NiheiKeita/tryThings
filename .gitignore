@@ -1,1 +1,4 @@
 **/env.js
+**/skyway/node_modules/*
+**/skyway/dist/*
+**/skyway/.parcel-cache/*
