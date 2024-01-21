@@ -1,0 +1,25 @@
+{
+  "name": "signaling-sdk-samples-web-vite",
+  "private": true,
+  "version": "0.0.0",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "agora-extension-ai-denoiser": "^1.1.0",
+    "agora-extension-spatial-audio": "1.0.0-beta1",
+    "agora-extension-virtual-background": "^1.1.3",
+    "agora-rtc-sdk-ng": "^4.18.2",
+    "cors-anywhere": "^0.4.4",
+    "livereload-js": "^4.0.1",
+    "pnpm": "^8.7.0",
+    "webrtc-adapter": "^8.2.3"
+  },
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "vite": "^4.4.5"
+  }
+}
