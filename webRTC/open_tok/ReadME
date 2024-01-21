@@ -1,0 +1,91 @@
+公式のビデオ通話のチュートリアル
+
+OpenTok に登録
+https://tokbox.com/account/user/signup
+
+管理画面 TOP にあるビデオセッションを作成を押してビデオ API の画面で作成するボタンを押す。
+
+すると、APIKEY などがコピペできるようになる。
+このページのナビ通りに、画面に映っている js を記載していくくと、この画面内でビデオ通話の画面が表示される。
+
+自分のローカル環境でビデオ通話を行う
+
+基本的には以下の URL の通りに行っていく
+https://tech.hajimari.inc/entry/2020/09/16/171027
+
+この URL ではフレームワークを使用しているが、今回は HTML と javascript だけで行う。
+
+index.html と main.js と env.js を同じファイル内の同じ階層に用意する。
+
+中身は以下のようにする。
+index.html
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <script type="text/javascript" src="../env.js"></script>
+  </head>
+  <body>
+    <div>
+      <div style="height: 80vh">
+        <div id="subscriber_area"></div>
+      </div>
+      <div style="height: 80vh">
+        <div id="publisher_area"></div>
+      </div>
+    </div>
+    <script src="https://unpkg.com/@vonage/client-sdk-video@latest/dist/js/opentok.js"></script>
+    <script type="module" src="main.js"></script>
+  </body>
+</html>
+main.js
+initializeSession();
+
+function handleError(error) {
+if (error) alert(error.message);
+}
+
+function initializeSession() {
+const session = OT.initSession(appId, sessionId);
+
+//自分
+const publisher = OT.initPublisher(
+"publisher",
+{
+targetElement: "publisher_area",
+width: "60%",
+height: "60%",
+},
+handleError
+);
+
+//相手
+session.on("streamCreated", function (event) {
+session.subscribe(
+event.stream,
+"subscriber",
+{
+targetElement: "subscriber_area",
+width: "60%",
+height: "60%",
+},
+handleError
+);
+});
+
+session.on("sessionDisconnected", function sessionDisconnected(event) {
+console.error("You were disconnected from the session.", event.reason);
+});
+
+session.connect(token, function (error) {
+error ? handleError(error) : session.publish(publisher, handleError);
+});
+}
+
+var APP_ID = ""****\*****";
+var SESSION_ID ="****\*****";
+var TOKEN ="****\*****";
+
+参考 URL
+https://tech.hajimari.inc/entry/2020/09/16/171027
