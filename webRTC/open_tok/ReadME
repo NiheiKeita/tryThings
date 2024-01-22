@@ -83,9 +83,14 @@ error ? handleError(error) : session.publish(publisher, handleError);
 });
 }
 
-var APP_ID = ""****\*****";
-var SESSION_ID ="****\*****";
-var TOKEN ="****\*****";
+env.js
+var APP_ID = ""\***\*\*\*\***";
+var SESSION_ID ="\***\*\*\*\***";
+var TOKEN ="\***\*\*\*\***";
+
+これで、index.html にブラウザでアクセスするとビデオ通話の画面が表示される。
+
+この状態でブラウザで別タブで index.html をもう一つ開くと、開いているタブ同士でビデオ通話がつながる
 
 参考 URL
 https://tech.hajimari.inc/entry/2020/09/16/171027
