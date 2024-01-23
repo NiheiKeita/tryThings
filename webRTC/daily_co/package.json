@@ -1,0 +1,8 @@
+{
+  "dependencies": {
+    "@daily-co/daily-js": "^0.56.0"
+  },
+  "devDependencies": {
+    "webpack": "^5.89.0"
+  }
+}
