@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Stereogram.js</title>
+
+    <style type="text/css">
+      body {
+        font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+        background: #003;
+        color: #fff;
+      }
+
+      body,
+      h1,
+      h2,
+      h3,
+      h4,
+      h5,
+      p {
+        font-weight: 300;
+      }
+
+      #main {
+        width: 700px;
+        margin: 60px auto;
+      }
+
+      input {
+        background: #003;
+        width: 90%;
+        margin: 0;
+      }
+
+      .slider {
+        width: 175px;
+        float: left;
+      }
+
+      #clear {
+        float: right;
+      }
+    </style>
+
+    <script type="text/javascript" src="../js/stereogram.js"></script>
+    <script
+      type="text/javascript"
+      src="../js/depthmappers/TemplateDepthMapper.js"
+    ></script>
+    <script
+      type="text/javascript"
+      src="../js/depthmappers/ImgDepthMapper.js"
+    ></script>
+    <script
+      type="text/javascript"
+      src="../js/depthmappers/CanvasDepthMapper.js"
+    ></script>
+    <script type="text/javascript">
+      var paint = {
+        brush: {
+          value: 255,
+          size: 40,
+          hardness: 0.5,
+          opacity: 0.05,
+        },
+
+        draw: function (e) {
+          var x = e.pageX - this.canvas.offsetLeft,
+            y = e.pageY - this.canvas.offsetTop,
+            gradient = this.context.createRadialGradient(
+              x,
+              y,
+              this.brush.size * this.brush.hardness,
+              x,
+              y,
+              this.brush.size
+            ),
+            rgb =
+              "" +
+              this.brush.value +
+              "," +
+              this.brush.value +
+              "," +
+              this.brush.value +
+              ",";
+          gradient.addColorStop(0, "rgba(" + rgb + this.brush.opacity + ")");
+          gradient.addColorStop(1, "rgba(" + rgb + "0)");
+          this.context.fillStyle = gradient;
+          this.context.fillRect(0, 0, this.canvas.width, this.canvas.height);
+        },
+
+        loadImage: function (src) {
+          var self = this,
+            img = new Image();
+          img.onload = function () {
+            self.context.drawImage(
+              img,
+              0,
+              0,
+              self.canvas.width,
+              self.canvas.height
+            );
+          };
+          img.src = src;
+        },
+
+        getDepthMap: function () {
+          var depthMap, pixelData, width, height, x, y, row, offset;
+          depthMap = [];
+          width = this.canvas.width;
+          height = this.canvas.height;
+          pixelData = this.context.getImageData(0, 0, width, height).data;
+          for (y = 0; y < height; y++) {
+            row = [];
+            offset = width * y * 4;
+            for (x = 0; x < width; x++) {
+              // assume grayscale (R, G, and B are equal)
+              row.push(pixelData[offset + x * 4]);
+            }
+            depthMap.push(row);
+          }
+          return depthMap;
+        },
+
+        init: function () {
+          (this.canvas = document.getElementById("paint")),
+            (this.context = this.canvas.getContext("2d"));
+          this.context.fillStyle = "#000000";
+          this.context.fillRect(0, 0, this.canvas.width, this.canvas.height);
+
+          this.drawing = false;
+
+          var self = this;
+
+          this.canvas.onmousedown = function (e) {
+            self.drawing = true;
+            self.draw(e);
+          };
+
+          this.canvas.onmousemove = function (e) {
+            if (self.drawing) self.draw(e);
+          };
+
+          document.body.onmouseup = function () {
+            self.drawing = false;
+          };
+
+          Stereogram.render({
+            el: "bmp",
+            // width: 700,
+            // height: 500,
+            colors: ["0f0", "00f", "f00", "ff0", "f0f", "0ff"],
+            depthMapper: new Stereogram.CanvasDepthMapper(
+              document.getElementById("paint")
+            ),
+          });
+
+          document.getElementById("render").onclick = function () {
+            Stereogram.render({
+              el: "bmp",
+              width: 700,
+              height: 500,
+              colors: ["0f0", "00f", "f00", "ff0", "f0f", "0ff"],
+              depthMapper: new Stereogram.CanvasDepthMapper(
+                document.getElementById("paint")
+              ),
+            });
+          };
+
+          document.getElementById("clear").onclick = function () {
+            self.context.fillStyle = "#000000";
+            self.context.fillRect(0, 0, self.canvas.width, self.canvas.height);
+          };
+
+          document.getElementById("load-image").onclick = function () {
+            self.loadImage("trike.jpg");
+          };
+
+          document.getElementById("size").onchange = function () {
+            self.brush.size = parseInt(this.value);
+          };
+
+          document.getElementById("hardness").onchange = function () {
+            self.brush.hardness = parseFloat(this.value);
+          };
+
+          document.getElementById("opacity").onchange = function () {
+            self.brush.opacity = parseFloat(this.value);
+          };
+
+          document.getElementById("value").onchange = function () {
+            self.brush.value = parseInt(this.value);
+          };
+        },
+      };
+    </script>
+  </head>
+
+  <body onload="paint.init();">
+    <div id="main">
+      <h1>Stereogram Painter</h1>
+      <hr />
+      <h4>
+        Draw your own depth maps and render them as autostereograms. The lighter
+        it is, the closer it will appear.
+      </h4>
+
+      <div class="slider">
+        <span>Size</span>
+        <br />
+        <input
+          id="size"
+          name="size"
+          type="range"
+          min="5"
+          max="50"
+          step="1"
+          value="40"
+        />
+      </div>
+
+      <div class="slider">
+        <span>Hardness</span>
+        <br />
+        <input
+          id="hardness"
+          type="range"
+          min="0.000"
+          max="0.999"
+          step="0.001"
+          value="0.5"
+        />
+      </div>
+
+      <div class="slider">
+        <span>Opacity</span>
+        <br />
+        <input
+          id="opacity"
+          type="range"
+          min="0.01"
+          max="1"
+          step="0.001"
+          value="0.5"
+        />
+      </div>
+
+      <div class="slider">
+        <span>Value</span>
+        <br />
+        <input
+          id="value"
+          type="range"
+          min="0"
+          max="255"
+          step="15"
+          value="255"
+        />
+      </div>
+
+      <canvas id="paint" width="700" height="500"></canvas>
+      <button id="render">Generate Stereogram</button>
+      <button id="load-image">Load image (trike.jpg)</button>
+      <button id="clear">Clear</button>
+      <hr />
+      <img id="bmp" width="700" height="500" src />
+      <hr />
+      <a href="http://ianpearce.org/">Ian Pearce, 2012</a>
+      <a href="https://github.com/peeinears/Stereogram.js" style="float: right"
+        >Stereogram.js on Github</a
+      >
+    </div>
+  </body>
+</html>
