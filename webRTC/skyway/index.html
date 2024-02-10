@@ -7,18 +7,17 @@
     <script type="text/javascript" src="./env.js"></script>
   </head>
   <body>
-    <p>ID: <span id="my-id"></span></p>
-    <div>
-      channel name: <input id="channel-name" type="text" />
-      <button id="join">join</button>
-    </div>
+    <p hidden>ID: <span id="my-id"></span></p>
+    <p>自分の映像</p>
     <video id="local-video" width="400px" muted playsinline></video>
     <div>
-      write dataStream: <input id="data-stream" type="text" />
-      <button id="write">write</button>
+      データを送信: <input id="data-stream" type="text" />
+      <button id="write">送信</button>
     </div>
     <div id="button-area"></div>
     <div id="remote-media-area"></div>
+    <div id="remote-audio-area"></div>
+    <div id="remote-text-area"></div>
     <script type="module" src="main.js"></script>
   </body>
 </html>
