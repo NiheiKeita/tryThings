@@ -317,7 +317,7 @@ async function createText(comment) {
   var random = Math.round(Math.random(document.documentElement.clientHeight));
   div_text.style.top = random + "px"; //初期状態の縦方向の位置は画面の上端から下端の間に設定（ランダムな配置に）
   div_text.appendChild(document.createTextNode(comment + count)); //画面上に表示されるテキストを設定
-  div_text.style.fontSize = "200px";
+  div_text.style.fontSize = "200px"; // 流れるコメントのサイズを設定
   document.body.appendChild(div_text); //body直下へ挿入
 
   //ライブラリを用いたテキスト移動のアニメーション： durationはアニメーションの時間、
