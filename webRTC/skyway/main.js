@@ -82,185 +82,202 @@ const token = new SkyWayAuthToken({
   video.attach(localVideo);
   await localVideo.play();
 
-  const data = await SkyWayStreamFactory.createDataStream();
-  writeButton.onclick = () => {
-    //TODO:送信ボタンを押したときの処理を作成す
-    var submitData = {
-      dataTyepe: SUBMIT_TEXT_KEY,
-      text: dataStreamInput.value,
-    };
-    data.write(submitData);
-    dataStreamInput.value = "";
-  };
+  const nameButton = document.getElementById("name_button");
+  nameButton.addEventListener(
+    "click",
+    async function () {
+      if (document.getElementById("member_name").value == "") {
+        return;
+      }
+      myMemberData.name = document.getElementById("member_name").value;
+      document.getElementById("member_name").disabled = true;
+      document.getElementById("name_button").hidden = true;
+      const data = await SkyWayStreamFactory.createDataStream();
+      writeButton.onclick = () => {
+        //TODO:送信ボタンを押したときの処理を作成す
+        var submitData = {
+          dataTyepe: SUBMIT_TEXT_KEY,
+          text: dataStreamInput.value,
+        };
+        data.write(submitData);
+        dataStreamInput.value = "";
+      };
 
-  const context = await SkyWayContext.Create(token);
-  const channel = await SkyWayRoom.FindOrCreate(context, {
-    //TODO:sfuに変更すればsfu通信に変わる（DATA通信ができないっぽい）
-    type: "p2p",
-    //TODO:ROOMのIDに修正
-    name: "nihei",
-  });
-  const me = await channel.join();
+      const context = await SkyWayContext.Create(token);
+      const channel = await SkyWayRoom.FindOrCreate(context, {
+        //TODO:sfuに変更すればsfu通信に変わる（DATA通信ができないっぽい）
+        type: "p2p",
+        //TODO:ROOMのIDに修正
+        name: "nihei",
+      });
+      const me = await channel.join();
+      myId.textContent = me.id;
 
-  myId.textContent = me.id;
+      await me.publish(audio);
+      await me.publish(video);
+      await me.publish(data);
+      // console.log("subscribeAndAttach");
 
-  await me.publish(audio);
-  await me.publish(video);
-  await me.publish(data);
-  // console.log("subscribeAndAttach");
+      const subscribeAndAttach = async (publication) => {
+        if (publication.publisher.id === me.id) return;
 
-  const subscribeAndAttach = async (publication) => {
-    if (publication.publisher.id === me.id) return;
+        // const subscribeButton = document.createElement("button");
+        // subscribeButton.textContent = `${publication.publisher.id}: ${publication.contentType}`;
+        // buttonArea.appendChild(subscribeButton);
+        const { stream } = await me.subscribe(publication.id);
+        // console.log("------------stream-------------");
+        // console.log(stream);
+        switch (stream.contentType) {
+          case "video":
+            {
+              //入ってきた人のvideoを作成する
+              const divVideo = document.createElement("div");
+              divVideo.setAttribute("class", "js-video-area");
+              const elm = document.createElement("video");
+              const inputVideoID = document.createElement("input");
+              inputVideoID.setAttribute("value", stream.id);
+              inputVideoID.setAttribute("class", "js-video-id");
+              inputVideoID.setAttribute("type", "hidden");
+              elm.playsInline = true;
+              elm.autoplay = true;
+              stream.attach(elm);
+              divVideo.appendChild(elm);
+              divVideo.appendChild(inputVideoID);
+              remoteMediaArea.appendChild(divVideo);
+            }
+            break;
+          case "audio":
+            {
+              //入ってきた人のAudioを作成する
+              const divAudio = document.createElement("div");
+              divAudio.setAttribute("class", "js-audio-area");
+              const elm = document.createElement("audio");
+              const inputAudioID = document.createElement("input");
+              inputAudioID.setAttribute("value", stream.id);
+              inputAudioID.setAttribute("class", "js-audio-id");
+              inputAudioID.setAttribute("type", "hidden");
+              elm.controls = true;
+              elm.autoplay = true;
+              stream.attach(elm);
+              divAudio.appendChild(elm);
+              divAudio.appendChild(inputAudioID);
+              remoteAudioArea.appendChild(divAudio);
+            }
+            break;
+          case "data": {
+            //データコネクション
+            const elm = document.createElement("div");
+            remoteTextArea.appendChild(elm);
+            elm.innerText = "data\n";
+            myMemberData.id = me.id;
+            myMemberData.audioID = me.id;
+            myMemberData.dataID = audio.id;
+            myMemberData.videoID = video.id;
 
-    // const subscribeButton = document.createElement("button");
-    // subscribeButton.textContent = `${publication.publisher.id}: ${publication.contentType}`;
-    // buttonArea.appendChild(subscribeButton);
-    const { stream } = await me.subscribe(publication.id);
-    // console.log("------------stream-------------");
-    // console.log(stream);
-    switch (stream.contentType) {
-      case "video":
-        {
-          //入ってきた人のvideoを作成する
-          const divVideo = document.createElement("div");
-          divVideo.setAttribute("class", "js-video-area");
-          const elm = document.createElement("video");
-          const inputVideoID = document.createElement("input");
-          inputVideoID.setAttribute("value", stream.id);
-          inputVideoID.setAttribute("class", "js-video-id");
-          inputVideoID.setAttribute("type", "hidden");
-          elm.playsInline = true;
-          elm.autoplay = true;
-          stream.attach(elm);
-          divVideo.appendChild(elm);
-          divVideo.appendChild(inputVideoID);
-          remoteMediaArea.appendChild(divVideo);
+            stream.onData.add((receiveData) => {
+              //NOTE:きたデータをうけ取る
+              if (receiveData.dataTyepe == ENTER_ROOM_KEY) {
+                //NOTE:新しく入ってきたメンバーのデータの受け取り
+                addMember(receiveData, elm);
+              } else if (receiveData.dataTyepe == LEAVE_ROOM_KEY) {
+                //NOTE:抜けるメンバーのデータの受け取り
+                deleteMember(receiveData.id);
+              } else if (receiveData.dataTyepe == SUBMIT_TEXT_KEY) {
+                //TODO:チャットを受け取った処理を作成する
+                elm.innerText += receiveData.text + "\n";
+                createText(receiveData.text);
+              }
+            });
+
+            //NOTE:入ってきた人にいｊぶデータ通信が確立されたときにその人に向けて自分のUserIDと表示の名前を送信する
+            data.write(myMemberData);
+          }
         }
-        break;
-      case "audio":
-        {
-          //入ってきた人のAudioを作成する
-          const divAudio = document.createElement("div");
-          divAudio.setAttribute("class", "js-audio-area");
-          const elm = document.createElement("audio");
-          const inputAudioID = document.createElement("input");
-          inputAudioID.setAttribute("value", stream.id);
-          inputVideoID.setAttribute("class", "js-audio-id");
-          inputVideoID.setAttribute("type", "hidden");
-          elm.appendChild(inputAudioID);
-          elm.controls = true;
-          elm.autoplay = true;
-          stream.attach(elm);
-          divAudio.appendChild(elm);
-          divAudio.appendChild(inputAudioID);
-          remoteAudioArea.appendChild(divAudio);
+      };
+      channel.publications.forEach(subscribeAndAttach);
+      channel.onStreamPublished.add((e) => {
+        subscribeAndAttach(e.publication);
+      });
+
+      channel.onMemberLeft.add((e) => {
+        console.log("---------onMemberLeft---------");
+        console.log(e.member.id);
+        deleteMember(e.member.id);
+      });
+
+      function addMember(member, elm) {
+        //メンバーが入室したときの処理
+        if (isOldMember(member.id)) {
+          return;
         }
-        break;
-      case "data": {
-        //データコネクション
+        elm.innerText += member.name + "が入室しました" + "\n";
+        elm.innerText += member.id + "がIDです" + "\n";
+        data.write(myMemberData);
+        var member = {
+          name: member.name,
+          id: member.id,
+          audioID: member.audioID,
+          dataID: member.dataID,
+          videoID: member.videoID,
+        };
+        memberList.push(member);
+
+        // console.log(document.getElementsByClassName("js-video-id")[0]);
+        //videoに名前を入れる
+        Array.from(document.getElementsByClassName("js-video-id")).forEach(
+          (e) => {
+            console.log(e.value);
+            if (e.value == member.videoID) {
+              const divName = document.createElement("div");
+              divName.innerText += member.name;
+              e.closest(".js-video-area").appendChild(divName);
+            }
+          }
+        );
+      }
+      function deleteMember(memberId) {
+        //メンバーが退出したときの処理
+        if (!isOldMember(memberId)) {
+          return;
+        }
+        var member = memberList.find((element) => element.id == memberId);
+        console.log(member);
         const elm = document.createElement("div");
         remoteTextArea.appendChild(elm);
-        elm.innerText = "data\n";
-        myMemberData.id = me.id;
-        myMemberData.audioID = me.id;
-        myMemberData.dataID = audio.id;
-        myMemberData.videoID = video.id;
+        elm.innerText += member.name + "が退室しました" + "\n";
+        elm.innerText += member.id + "がIDです" + "\n";
 
-        stream.onData.add((receiveData) => {
-          //NOTE:きたデータをうけ取る
-          if (receiveData.dataTyepe == ENTER_ROOM_KEY) {
-            //NOTE:新しく入ってきたメンバーのデータの受け取り
-            addMember(receiveData, elm);
-          } else if (receiveData.dataTyepe == LEAVE_ROOM_KEY) {
-            //NOTE:抜けるメンバーのデータの受け取り
-            deleteMember(receiveData.id);
-          } else if (receiveData.dataTyepe == SUBMIT_TEXT_KEY) {
-            //TODO:チャットを受け取った処理を作成する
-            elm.innerText += receiveData.text + "\n";
-            createText(receiveData.text);
+        //ビデオを削除
+        Array.from(document.getElementsByClassName("js-video-id")).forEach(
+          (e) => {
+            console.log(e.value);
+            if (e.value == member.videoID) {
+              e.closest(".js-video-area").remove();
+            }
           }
-        });
-
-        //NOTE:入ってきた人にいｊぶデータ通信が確立されたときにその人に向けて自分のUserIDと表示の名前を送信する
-        data.write(myMemberData);
+        );
+        //オーディオを削除
+        Array.from(document.getElementsByClassName("js-audio-id")).forEach(
+          (e) => {
+            console.log(e.value);
+            if (e.value == member.audioID) {
+              e.closest(".js-audio-area").remove();
+            }
+          }
+        );
+        //memberListから削除
+        memberList.splice(
+          memberList.value.findIndex((element) => element.id == memberId),
+          1
+        );
       }
-    }
-  };
-  channel.publications.forEach(subscribeAndAttach);
-  channel.onStreamPublished.add((e) => {
-    subscribeAndAttach(e.publication);
-  });
-
-  channel.onMemberLeft.add((e) => {
-    console.log("---------onMemberLeft---------");
-    console.log(e.member.id);
-    deleteMember(e.member.id);
-  });
-
-  function addMember(member, elm) {
-    //メンバーが入室したときの処理
-    if (isOldMember(member.id)) {
-      return;
-    }
-    elm.innerText += member.name + "が入室しました" + "\n";
-    elm.innerText += member.id + "がIDです" + "\n";
-    data.write(myMemberData);
-    var member = {
-      name: member.name,
-      id: member.id,
-      audioID: member.audioID,
-      dataID: member.dataID,
-      videoID: member.videoID,
-    };
-    memberList.push(member);
-
-    // console.log(document.getElementsByClassName("js-video-id")[0]);
-    //videoに名前を入れる
-    Array.from(document.getElementsByClassName("js-video-id")).forEach((e) => {
-      console.log(e.value);
-      if (e.value == member.videoID) {
-        const divName = document.createElement("div");
-        divName.innerText += member.name;
-        e.closest(".js-video-area").appendChild(divName);
+      function isOldMember(memberId) {
+        var oldMember = memberList.find((element) => element.id == memberId);
+        return oldMember != undefined;
       }
-    });
-  }
-  function deleteMember(memberId) {
-    //メンバーが退出したときの処理
-    if (!isOldMember(memberId)) {
-      return;
-    }
-    var member = memberList.find((element) => element.id == memberId);
-    console.log(member);
-    const elm = document.createElement("div");
-    remoteTextArea.appendChild(elm);
-    elm.innerText += member.name + "が退室しました" + "\n";
-    elm.innerText += member.id + "がIDです" + "\n";
-
-    //ビデオを削除
-    Array.from(document.getElementsByClassName("js-video-id")).forEach((e) => {
-      console.log(e.value);
-      if (e.value == member.videoID) {
-        e.closest(".js-video-area").remove();
-      }
-    });
-    //オーディオを削除
-    Array.from(document.getElementsByClassName("js-audio-id")).forEach((e) => {
-      console.log(e.value);
-      if (e.value == member.audioID) {
-        e.closest(".js-audio-area").remove();
-      }
-    });
-    //memberListから削除
-    memberList.splice(
-      memberList.value.findIndex((element) => element.id == memberId),
-      1
-    );
-  }
-  function isOldMember(memberId) {
-    var oldMember = memberList.find((element) => element.id == memberId);
-    return oldMember != undefined;
-  }
+    },
+    false
+  );
 })();
 
 const button01 = document.getElementById("button01");
