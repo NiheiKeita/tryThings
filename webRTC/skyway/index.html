@@ -10,21 +10,87 @@
       defer
     ></script>
     <script src="https://cdn.jsdelivr.net/npm/@skyway-sdk/room/dist/skyway_room-latest.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      .video-class {
+        width: 29%;
+        margin: 4px;
+        background-color: #fff;
+      }
+    </style>
   </head>
-  <body>
-    <input type="text" name="" id="member_name" value="" />
-    <button id="name_button">名前を設定して通話を始める</button>
-    <p hidden>ID: <span id="my-id"></span></p>
-    <p>自分の映像</p>
-    <video id="local-video" width="400px" muted playsinline></video>
-    <div>
+  <body class="font-serif">
+    <div class="flex justify-between m-5">
+      <div class="text-xl font-bold">いろいろな話をしよう！</div>
+      <div id="my_icon_name">USERNAME</div>
+    </div>
+    <!-- <div class="flex">
+      <input type="text" name="" id="member_name" value="" />
+      <button id="name_button" class="">名前を設定して通話を始める</button>
+    </div> -->
+    <div
+      class="fixed bg-black bg-opacity-50 top-0 bottom-0 right-0 left-0 z-50"
+      id="name_popup"
+    >
+      <div class="flex justify-center items-center w-full h-full">
+        <div class="bg-white px-10 py-6 rounded-md w-1/2">
+          <div class="mb-4">
+            <label for="member_name" class="block text-gray-700 font-bold mb-2"
+              >名前</label
+            >
+            <input
+              id="member_name"
+              type="text"
+              placeholder="表示する名前を入力してください "
+              class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+            />
+          </div>
+          <div class="mb-4">
+            <button
+              class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline"
+              type="button"
+              id="name_button"
+            >
+              設定する
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div
+      id="remote-media-area"
+      class="w-full flex justify-left p-8 flex-wrap"
+    ></div>
+    <!-- <p hidden>ID: <span id="my-id"></span></p> -->
+    <!-- <p>自分の映像</p> -->
+    <!-- <video id="local-video" width="400px" muted playsinline></video> -->
+    <!-- <div>
       データを送信: <input id="data-stream" type="text" />
       <button id="write">送信</button>
+    </div> -->
+    <div class="mx-auto fixed bottom-0 w-full p-6 bg-gray-300">
+      <div
+        class="flex items-center border border-gray-300 rounded-lg overflow-hidden"
+      >
+        <input
+          id="data-stream"
+          type="text"
+          placeholder="送信したいメッセージを入力してください"
+          class="w-full px-4 py-2 text-gray-700 focus:outline-none bg-white"
+        />
+        <button
+          id="write"
+          class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 focus:outline-none min-w-[100px]"
+        >
+          送信する
+        </button>
+      </div>
     </div>
-    <div id="button-area"></div>
-    <div id="remote-media-area"></div>
-    <div id="remote-audio-area"></div>
-    <div id="remote-text-area"></div>
+    <!-- <div id="button-area"></div> -->
+    <!-- <div id="remote-media-area"></div> -->
+    <div hidden id="remote-audio-area"></div>
+    <div hidden id="remote-text-area"></div>
     <!-- <button id="button01">テキストを流す</button> -->
     <script type="module" src="main.js"></script>
   </body>

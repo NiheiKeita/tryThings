@@ -73,7 +73,7 @@ const token = new SkyWayAuthToken({
   },
 }).encode(SECRET_ID);
 (async () => {
-  const localVideo = document.getElementById("local-video");
+  // const localVideo = document.getElementById("local-video");
   // const buttonArea = document.getElementById("button-area");
   const remoteMediaArea = document.getElementById("remote-media-area");
   const remoteAudioArea = document.getElementById("remote-audio-area");
@@ -81,12 +81,28 @@ const token = new SkyWayAuthToken({
 
   const dataStreamInput = document.getElementById("data-stream");
 
-  const myId = document.getElementById("my-id");
+  // const myId = document.getElementById("my-id");
   const writeButton = document.getElementById("write");
 
   const { audio, video } =
     await SkyWayStreamFactory.createMicrophoneAudioAndCameraStream();
+
+  //自分のビデオエリア作成
+  const divVideo = document.createElement("div");
+  divVideo.setAttribute("id", "my_video_area");
+  divVideo.setAttribute("class", "video-class");
+  const localVideo = document.createElement("video");
+  const divName = document.createElement("div");
+  divName.setAttribute("id", "my_name");
+  divName.innerText += "";
+  localVideo.playsInline = true;
+  localVideo.autoplay = true;
   video.attach(localVideo);
+  divVideo.appendChild(localVideo);
+  divVideo.appendChild(divName);
+  remoteMediaArea.appendChild(divVideo);
+
+  // video.attach(localVideo);
   await localVideo.play();
 
   const nameButton = document.getElementById("name_button");
@@ -96,17 +112,25 @@ const token = new SkyWayAuthToken({
       if (document.getElementById("member_name").value == "") {
         return;
       }
+      document.getElementById("name_popup").hidden = true;
+
+      document.getElementById("my_name").innerText =
+        document.getElementById("member_name").value;
+      document.getElementById("my_icon_name").innerText =
+        document.getElementById("member_name").value;
+
       myMemberData.name = document.getElementById("member_name").value;
       document.getElementById("member_name").disabled = true;
       document.getElementById("name_button").hidden = true;
       const data = await SkyWayStreamFactory.createDataStream();
       writeButton.onclick = () => {
-        //TODO:送信ボタンを押したときの処理を作成す
+        //送信ボタンを押したときの処理を作成r
         var submitData = {
           dataTyepe: SUBMIT_TEXT_KEY,
           text: dataStreamInput.value,
         };
         data.write(submitData);
+        createText(dataStreamInput.value);
         dataStreamInput.value = "";
       };
 
@@ -118,7 +142,7 @@ const token = new SkyWayAuthToken({
         name: "nihei",
       });
       const me = await channel.join();
-      myId.textContent = me.id;
+      // myId.textContent = me.id;
 
       await me.publish(video);
       await me.publish(audio);
@@ -140,7 +164,7 @@ const token = new SkyWayAuthToken({
               console.log(stream);
               //入ってきた人のvideoを作成する
               const divVideo = document.createElement("div");
-              divVideo.setAttribute("class", "js-video-area");
+              divVideo.setAttribute("class", "js-video-area video-class");
               const elm = document.createElement("video");
               const inputVideoID = document.createElement("input");
               inputVideoID.setAttribute("value", stream.id);
@@ -193,6 +217,7 @@ const token = new SkyWayAuthToken({
               } else if (receiveData.dataTyepe == SUBMIT_TEXT_KEY) {
                 //TODO:チャットを受け取った処理を作成する
                 elm.innerText += receiveData.text + "\n";
+                console.log("receiveData.text");
                 createText(receiveData.text);
               }
             });
@@ -285,7 +310,7 @@ const token = new SkyWayAuthToken({
       }
 
       //退室ボタンを押したときの処理
-      document.getElementById("leave_button").addEventListener(
+      document.getElementById("leave_button")?.addEventListener(
         "click",
         function () {
           deleteMember(myMemberData.id);
@@ -314,10 +339,12 @@ async function createText(comment) {
   div_text.style.position = "fixed"; //テキストのは位置を絶対位置にするための設定
   div_text.style.whiteSpace = "nowrap"; //画面右端での折り返しがなく、画面外へはみ出すようにする
   div_text.style.left = document.documentElement.clientWidth + "px"; //初期状態の横方向の位置は画面の右端に設定
-  var random = Math.round(Math.random(document.documentElement.clientHeight));
+  var random = Math.round(
+    Math.random() * document.documentElement.clientHeight
+  );
   div_text.style.top = random + "px"; //初期状態の縦方向の位置は画面の上端から下端の間に設定（ランダムな配置に）
   div_text.appendChild(document.createTextNode(comment + count)); //画面上に表示されるテキストを設定
-  div_text.style.fontSize = "200px"; // 流れるコメントのサイズを設定
+  div_text.style.fontSize = "20px"; // 流れるコメントのサイズを設定
   document.body.appendChild(div_text); //body直下へ挿入
 
   //ライブラリを用いたテキスト移動のアニメーション： durationはアニメーションの時間、
