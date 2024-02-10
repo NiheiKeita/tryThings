@@ -9,6 +9,8 @@ import {
 
 const ENTER_ROOM_KEY = "enter_room";
 const LEAVE_ROOM_KEY = "leave_room";
+const SUBMIT_TEXT_KEY = "submit_text";
+
 const memberList = [];
 var myMemberData = {
   dataTyepe: ENTER_ROOM_KEY,
@@ -82,8 +84,10 @@ const token = new SkyWayAuthToken({
 
   const data = await SkyWayStreamFactory.createDataStream();
   writeButton.onclick = () => {
+    //TODO:送信ボタンを押したときの処理を作成す
     var submitData = {
-      name: dataStreamInput.value,
+      dataTyepe: SUBMIT_TEXT_KEY,
+      text: dataStreamInput.value,
     };
     data.write(submitData);
     dataStreamInput.value = "";
@@ -103,7 +107,7 @@ const token = new SkyWayAuthToken({
   await me.publish(audio);
   await me.publish(video);
   await me.publish(data);
-  console.log("subscribeAndAttach");
+  // console.log("subscribeAndAttach");
 
   const subscribeAndAttach = async (publication) => {
     if (publication.publisher.id === me.id) return;
@@ -164,8 +168,9 @@ const token = new SkyWayAuthToken({
             addMember(receiveData, elm);
           } else if (receiveData.dataTyepe == LEAVE_ROOM_KEY) {
             deleteMember(receiveData.id);
-          } else {
-            elm.innerText += receiveData + "\n";
+          } else if (receiveData.dataTyepe == SUBMIT_TEXT_KEY) {
+            //TODO:チャットを受け取った処理を作成する
+            elm.innerText += receiveData.text + "\n";
           }
         });
 
