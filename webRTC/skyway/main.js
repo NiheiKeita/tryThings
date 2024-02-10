@@ -74,64 +74,65 @@ const token = new SkyWayAuthToken({
     dataStreamInput.value = "";
   };
 
-  joinButton.onclick = async () => {
-    if (channelNameInput.value === "") return;
+  const context = await SkyWayContext.Create(token);
+  const channel = await SkyWayRoom.FindOrCreate(context, {
+    type: "p2p",
+    // name: channelNameInput.value,
+    //TODO:ROOMのIDに修正
+    name: "nihei",
+  });
+  const me = await channel.join();
 
-    const context = await SkyWayContext.Create(token);
-    const channel = await SkyWayRoom.FindOrCreate(context, {
-      type: "p2p",
-      name: channelNameInput.value,
-    });
-    const me = await channel.join();
+  myId.textContent = me.id;
 
-    myId.textContent = me.id;
+  await me.publish(audio);
+  await me.publish(video);
+  await me.publish(data);
+  console.log("subscribeAndAttach");
 
-    await me.publish(audio);
-    await me.publish(video);
-    await me.publish(data);
+  const subscribeAndAttach = (publication) => {
+    console.log("subscribeAndAttach");
+    console.log(publication.publisher.id);
+    console.log(me.id);
+    if (publication.publisher.id === me.id) return;
 
-    const subscribeAndAttach = (publication) => {
-      if (publication.publisher.id === me.id) return;
+    const subscribeButton = document.createElement("button");
+    subscribeButton.textContent = `${publication.publisher.id}: ${publication.contentType}`;
+    buttonArea.appendChild(subscribeButton);
 
-      const subscribeButton = document.createElement("button");
-      subscribeButton.textContent = `${publication.publisher.id}: ${publication.contentType}`;
-      buttonArea.appendChild(subscribeButton);
+    subscribeButton.onclick = async () => {
+      const { stream } = await me.subscribe(publication.id);
 
-      subscribeButton.onclick = async () => {
-        const { stream } = await me.subscribe(publication.id);
-
-        switch (stream.contentType) {
-          case "video":
-            {
-              const elm = document.createElement("video");
-              elm.playsInline = true;
-              elm.autoplay = true;
-              stream.attach(elm);
-              remoteMediaArea.appendChild(elm);
-            }
-            break;
-          case "audio":
-            {
-              const elm = document.createElement("audio");
-              elm.controls = true;
-              elm.autoplay = true;
-              stream.attach(elm);
-              remoteMediaArea.appendChild(elm);
-            }
-            break;
-          case "data": {
-            const elm = document.createElement("div");
+      switch (stream.contentType) {
+        case "video":
+          {
+            const elm = document.createElement("video");
+            elm.playsInline = true;
+            elm.autoplay = true;
+            stream.attach(elm);
             remoteMediaArea.appendChild(elm);
-            elm.innerText = "data\n";
-            stream.onData.add((data) => {
-              elm.innerText += data + "\n";
-            });
           }
+          break;
+        case "audio":
+          {
+            const elm = document.createElement("audio");
+            elm.controls = true;
+            elm.autoplay = true;
+            stream.attach(elm);
+            remoteMediaArea.appendChild(elm);
+          }
+          break;
+        case "data": {
+          const elm = document.createElement("div");
+          remoteMediaArea.appendChild(elm);
+          elm.innerText = "data\n";
+          stream.onData.add((data) => {
+            elm.innerText += data + "\n";
+          });
         }
-      };
+      }
     };
-
-    channel.publications.forEach(subscribeAndAttach);
-    channel.onStreamPublished.add((e) => subscribeAndAttach(e.publication));
   };
+  channel.publications.forEach(subscribeAndAttach);
+  channel.onStreamPublished.add((e) => subscribeAndAttach(e.publication));
 })();
