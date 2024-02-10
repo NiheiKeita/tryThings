@@ -1,12 +1,20 @@
-import {
+// import {
+//   nowInSec,
+//   SkyWayAuthToken,
+//   SkyWayContext,
+//   SkyWayRoom,
+//   SkyWayStreamFactory,
+//   uuidV4,
+// } from "@skyway-sdk/room";
+
+const {
   nowInSec,
   SkyWayAuthToken,
   SkyWayContext,
-  SkyWayRoom,
   SkyWayStreamFactory,
+  SkyWayRoom,
   uuidV4,
-} from "@skyway-sdk/room";
-
+} = skyway_room;
 const ENTER_ROOM_KEY = "enter_room";
 const LEAVE_ROOM_KEY = "leave_room";
 const SUBMIT_TEXT_KEY = "submit_text";
@@ -64,7 +72,6 @@ const token = new SkyWayAuthToken({
     },
   },
 }).encode(SECRET_ID);
-
 (async () => {
   const localVideo = document.getElementById("local-video");
   // const buttonArea = document.getElementById("button-area");
@@ -113,8 +120,8 @@ const token = new SkyWayAuthToken({
       const me = await channel.join();
       myId.textContent = me.id;
 
-      await me.publish(audio);
       await me.publish(video);
+      await me.publish(audio);
       await me.publish(data);
       // console.log("subscribeAndAttach");
 
@@ -130,6 +137,7 @@ const token = new SkyWayAuthToken({
         switch (stream.contentType) {
           case "video":
             {
+              console.log(stream);
               //入ってきた人のvideoを作成する
               const divVideo = document.createElement("div");
               divVideo.setAttribute("class", "js-video-area");
@@ -168,7 +176,7 @@ const token = new SkyWayAuthToken({
             //データコネクション
             const elm = document.createElement("div");
             remoteTextArea.appendChild(elm);
-            elm.innerText = "data\n";
+            // elm.innerText = "data\n";
             myMemberData.id = me.id;
             myMemberData.audioID = me.id;
             myMemberData.dataID = audio.id;
@@ -211,7 +219,7 @@ const token = new SkyWayAuthToken({
           return;
         }
         elm.innerText += member.name + "が入室しました" + "\n";
-        elm.innerText += member.id + "がIDです" + "\n";
+        // elm.innerText += member.id + "がIDです" + "\n";
         data.write(myMemberData);
         var member = {
           name: member.name,
@@ -245,7 +253,7 @@ const token = new SkyWayAuthToken({
         const elm = document.createElement("div");
         remoteTextArea.appendChild(elm);
         elm.innerText += member.name + "が退室しました" + "\n";
-        elm.innerText += member.id + "がIDです" + "\n";
+        // elm.innerText += member.id + "がIDです" + "\n";
 
         //ビデオを削除
         Array.from(document.getElementsByClassName("js-video-id")).forEach(
@@ -275,6 +283,15 @@ const token = new SkyWayAuthToken({
         var oldMember = memberList.find((element) => element.id == memberId);
         return oldMember != undefined;
       }
+
+      //退室ボタンを押したときの処理
+      document.getElementById("leave_button").addEventListener(
+        "click",
+        function () {
+          deleteMember(myMemberData.id);
+        },
+        false
+      );
     },
     false
   );
