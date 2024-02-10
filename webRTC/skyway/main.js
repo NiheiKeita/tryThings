@@ -67,7 +67,7 @@ const token = new SkyWayAuthToken({
 
 (async () => {
   const localVideo = document.getElementById("local-video");
-  const buttonArea = document.getElementById("button-area");
+  // const buttonArea = document.getElementById("button-area");
   const remoteMediaArea = document.getElementById("remote-media-area");
   const remoteAudioArea = document.getElementById("remote-audio-area");
   const remoteTextArea = document.getElementById("remote-text-area");
@@ -112,9 +112,9 @@ const token = new SkyWayAuthToken({
   const subscribeAndAttach = async (publication) => {
     if (publication.publisher.id === me.id) return;
 
-    const subscribeButton = document.createElement("button");
-    subscribeButton.textContent = `${publication.publisher.id}: ${publication.contentType}`;
-    buttonArea.appendChild(subscribeButton);
+    // const subscribeButton = document.createElement("button");
+    // subscribeButton.textContent = `${publication.publisher.id}: ${publication.contentType}`;
+    // buttonArea.appendChild(subscribeButton);
     const { stream } = await me.subscribe(publication.id);
     // console.log("------------stream-------------");
     // console.log(stream);
@@ -139,11 +139,14 @@ const token = new SkyWayAuthToken({
         break;
       case "audio":
         {
+          //入ってきた人のAudioを作成する
           const divAudio = document.createElement("div");
           divAudio.setAttribute("class", "js-audio-area");
           const elm = document.createElement("audio");
           const inputAudioID = document.createElement("input");
           inputAudioID.setAttribute("value", stream.id);
+          inputVideoID.setAttribute("class", "js-audio-id");
+          inputVideoID.setAttribute("type", "hidden");
           elm.appendChild(inputAudioID);
           elm.controls = true;
           elm.autoplay = true;
@@ -154,6 +157,7 @@ const token = new SkyWayAuthToken({
         }
         break;
       case "data": {
+        //データコネクション
         const elm = document.createElement("div");
         remoteTextArea.appendChild(elm);
         elm.innerText = "data\n";
@@ -163,10 +167,12 @@ const token = new SkyWayAuthToken({
         myMemberData.videoID = video.id;
 
         stream.onData.add((receiveData) => {
-          //NOTE:きたデータを取る
+          //NOTE:きたデータをうけ取る
           if (receiveData.dataTyepe == ENTER_ROOM_KEY) {
+            //NOTE:新しく入ってきたメンバーのデータの受け取り
             addMember(receiveData, elm);
           } else if (receiveData.dataTyepe == LEAVE_ROOM_KEY) {
+            //NOTE:抜けるメンバーのデータの受け取り
             deleteMember(receiveData.id);
           } else if (receiveData.dataTyepe == SUBMIT_TEXT_KEY) {
             //TODO:チャットを受け取った処理を作成する
@@ -192,6 +198,7 @@ const token = new SkyWayAuthToken({
   });
 
   function addMember(member, elm) {
+    //メンバーが入室したときの処理
     if (isOldMember(member.id)) {
       return;
     }
@@ -207,11 +214,11 @@ const token = new SkyWayAuthToken({
     };
     memberList.push(member);
 
-    console.log(document.getElementsByClassName("js-video-id")[0]);
+    // console.log(document.getElementsByClassName("js-video-id")[0]);
+    //videoに名前を入れる
     Array.from(document.getElementsByClassName("js-video-id")).forEach((e) => {
       console.log(e.value);
       if (e.value == member.videoID) {
-        //videoに名前を入れるところ
         const divName = document.createElement("div");
         divName.innerText += member.name;
         e.closest(".js-video-area").appendChild(divName);
@@ -219,16 +226,36 @@ const token = new SkyWayAuthToken({
     });
   }
   function deleteMember(memberId) {
-    // if (!isOldMember(memberId)) {
-    //   return;
-    // }
-    //TODO:退出したときの処理を作成する
+    //メンバーが退出したときの処理
+    if (!isOldMember(memberId)) {
+      return;
+    }
     var member = memberList.find((element) => element.id == memberId);
     console.log(member);
     const elm = document.createElement("div");
     remoteTextArea.appendChild(elm);
     elm.innerText += member.name + "が退室しました" + "\n";
     elm.innerText += member.id + "がIDです" + "\n";
+
+    //ビデオを削除
+    Array.from(document.getElementsByClassName("js-video-id")).forEach((e) => {
+      console.log(e.value);
+      if (e.value == member.videoID) {
+        e.closest(".js-video-area").remove();
+      }
+    });
+    //オーディオを削除
+    Array.from(document.getElementsByClassName("js-audio-id")).forEach((e) => {
+      console.log(e.value);
+      if (e.value == member.audioID) {
+        e.closest(".js-audio-area").remove();
+      }
+    });
+    //memberListから削除
+    memberList.splice(
+      memberList.value.findIndex((element) => element.id == memberId),
+      1
+    );
   }
   function isOldMember(memberId) {
     var oldMember = memberList.find((element) => element.id == memberId);
