@@ -19,9 +19,20 @@
       }
     </style>
   </head>
-  <body class="font-serif">
+  <body class="font-serif text-xl">
     <div class="flex justify-between m-5">
-      <div class="text-xl font-bold">いろいろな話をしよう！</div>
+      <div class="flex">
+        <p class="text-3xl font-bold">いろいろな話をしよう！</p>
+        <div class="mb-4">
+          <button
+            class="bg-red-500 hover:bg-red-700 text-white font-bold py-1 px-2 rounded focus:outline-none focus:shadow-outline"
+            type="button"
+            id="leave_button"
+          >
+            退室する
+          </button>
+        </div>
+      </div>
       <div id="my_icon_name">USERNAME</div>
     </div>
     <!-- <div class="flex">
@@ -70,6 +81,15 @@
       <button id="write">送信</button>
     </div> -->
     <div class="mx-auto fixed bottom-0 w-full p-6 bg-gray-300">
+      <div class="">
+        <button
+          class="bg-red-500 hover:bg-red-700 text-white font-bold py-1 mb-2 px-2 rounded focus:outline-none focus:shadow-outline"
+          type="button"
+          id="video_change"
+        >
+          ビデオ切り替え
+        </button>
+      </div>
       <div
         class="flex items-center border border-gray-300 rounded-lg overflow-hidden"
       >
@@ -81,7 +101,7 @@
         />
         <button
           id="write"
-          class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 focus:outline-none min-w-[100px]"
+          class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 focus:outline-none min-w-[150px]"
         >
           送信する
         </button>
