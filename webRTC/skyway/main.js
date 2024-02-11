@@ -123,6 +123,18 @@ const token = new SkyWayAuthToken({
       document.getElementById("member_name").disabled = true;
       document.getElementById("name_button").hidden = true;
       const data = await SkyWayStreamFactory.createDataStream();
+
+      //退室ボタンを押したときの処理
+      document.getElementById("leave_button")?.addEventListener(
+        "click",
+        function () {
+          //NOTE:抜ける前にみんなに退室を知らせる
+          myMemberData.dataTyepe = LEAVE_ROOM_KEY;
+          data.write(myMemberData);
+          history.back();
+        },
+        false
+      );
       writeButton.onclick = () => {
         //送信ボタンを押したときの処理を作成r
         var submitData = {
@@ -308,30 +320,12 @@ const token = new SkyWayAuthToken({
         var oldMember = memberList.find((element) => element.id == memberId);
         return oldMember != undefined;
       }
-
-      //退室ボタンを押したときの処理
-      document.getElementById("leave_button")?.addEventListener(
-        "click",
-        function () {
-          deleteMember(myMemberData.id);
-        },
-        false
-      );
     },
     false
   );
 })();
 
-// const button01 = document.getElementById("button01");
-// button01.addEventListener(
-//   "click",
-//   function () {
-//     createText("うんち～～～～～");
-//   },
-//   false
-// );
 let count = 0;
-
 async function createText(comment) {
   let div_text = document.createElement("div");
   div_text.id = "text" + count; //アニメーション処理で対象の指定に必要なidを設定
