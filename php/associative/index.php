@@ -58,3 +58,23 @@ function mathTestScores($value)
 $result = array_map("mathTestScores", $array);
 
 print_r($result);
+
+
+$array = [
+    ["id" => 1, "name" => "taro", "test_scores" => ["math" => 25, "science" => 59]],
+    ["id" => 2, "name" => "jiro", "test_scores" => ["math" => 66, "science" => 19]],
+    ["id" => 3, "name" => "saburo", "test_scores" => ["math" => 40, "science" => 80]]
+];
+
+
+function associative($value, ...$keys)
+{
+    $result = $value;
+    foreach($keys as $key){
+        $result = array_column($result, $key);
+    }
+    return $result;
+}
+
+print_r(associative($array, "test_scores", "math"));
+print_r(associative($array, "name"));
