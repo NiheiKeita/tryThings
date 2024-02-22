@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width" />
+    <title></title>
+    <script src="https://cdn.tailwindcss.com"></script>
+  </head>
+  <body class="bg-gray-100 font-serif text-xl">
+    <div
+      id="all-area"
+      class="w-[500px] h-[500px] flex flex-row flex-wrap bg-red-500"
+    >
+      <div class="js-photo-area bg-black border-white border"></div>
+      <div class="js-photo-area bg-black border-white border"></div>
+      <div class="js-photo-area bg-black border-white border"></div>
+      <div class="js-photo-area bg-black border-white border"></div>
+      <div class="js-photo-area bg-black border-white border"></div>
+    </div>
+    <script>
+      function optimalWidth(photoNum, aspectRatio, allWidth, allHeight) {
+        resultWidth = 0;
+        for (let i = 1; i <= photoNum; i++) {
+          var w = allWidth / i;
+          var heightNum = Math.ceil(photoNum / i);
+          var h = allHeight / heightNum;
+          var aspectH = w * aspectRatio * heightNum;
+          var widthFromeight = h / aspectRatio;
+          var aspectW = widthFromeight * i;
+          if (allHeight >= aspectH && w > resultWidth) {
+            resultWidth = w;
+          }
+          if (allWidth >= aspectW && widthFromeight > resultWidth) {
+            resultWidth = widthFromeight;
+          }
+        }
+        return resultWidth;
+      }
+
+      var photoNum = 5;
+      var aspectRatio = 9 / 16;
+      let allWidth = document.getElementById("all-area").clientWidth;
+      let allHeight = document.getElementById("all-area").clientHeight;
+
+      let optimalW = optimalWidth(photoNum, aspectRatio, allWidth, allHeight);
+
+      var photoAreas = document.getElementsByClassName("js-photo-area");
+      Array.from(photoAreas).forEach((photArea) => {
+        console.log("s");
+        photArea.style.width = optimalW + "px";
+        photArea.style.height = optimalW * aspectRatio + "px";
+      });
+
+      var isPendding = false;
+      function resizeWindow() {
+        if (isPendding) {
+          return;
+        }
+        isPendding = true;
+        window.setTimeout(function () {
+          isPendding = false;
+        }, 100);
+        console.log("サイズが変わりました");
+      }
+      window.addEventListener("resize", resizeWindow);
+    </script>
+  </body>
+</html>
