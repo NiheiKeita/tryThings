@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width" />
+    <title></title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://code.jquery.com/jquery-1.9.1.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/markdown-it/8.2.2/markdown-it.min.js"></script>
+  </head>
+  <body>
+    <div class="l-main-editer js-markdown-editer">
+# h1タイトル
+
+## h2タイトルタイトルタイトルタイトル
+
+### h3タイトルタイトルタイトルタイトル
+
+ダミーテキストです。ダミーテキストです。ダミーテキストです。ダミーテキストです。ダミーテキストです。ダミーテキストです。ダミーテキストです。ダミーテキストです。ダミーテキストです。ダミーテキストです。ダミーテキストです。ダミーテキストです。ダミーテキストです。
+ダミーテキストです。ダミーテキストです。ダミーテキストです。ダミーテキストです。ダミーテキストです。ダミーテキストです。
+
+強調したい箇所は**このように強調させる**ことも可能。
+
+- リスト1
+- リスト2
+    - リスト2-1
+    - リスト2-2
+    - リスト2-3
+- リスト3
+- リスト4
+
+リンクは[リンクテキスト](https://yurukei-career.com/)のように記載。引用ブロックは以下。
+
+> 引用ブロックはこのようになる。
+改行もこのように組み込まれる。
+
+## テーブル
+
+| No | 名前 | 年齢 |
+|---:|----:|:----:|
+| 1  | 山田 |  24 |
+| 2  | 田中 |  48 |
+
+---
+
+HTMLをそのまま埋め込むことも可能。
+      
+    </div>
+    <script>
+      // マークダウンの基本設定
+      const markdown_setting = window.markdownit({
+        html: true, // htmlタグを有効にする
+        breaks: true, // md内の改行を<br>に変換
+      });
+
+      // .js-markdown-editerを定義
+      const markdown_editer = $(".js-markdown-editer");
+
+      // マークダウンの設定をjs-markdown-editerにHTMLとして反映させる
+      const markdown_html = markdown_setting.render(getHtml(markdown_editer));
+      markdown_editer.html(markdown_html);
+        
+      // 比較演算子（=，<>，<，<=，>，>=）をそのまま置換する
+      function getHtml(selector) {
+        let markdown_text = $(selector).html();
+        markdown_text = markdown_text.replace(/&lt;/g, "<");
+        markdown_text = markdown_text.replace(/&gt;/g, ">");
+        markdown_text = markdown_text.replace(/&amp;/g, "&");
+
+        return markdown_text;
+      }
+    </script>
+  </body>
+</html>
