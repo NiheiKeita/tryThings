@@ -75,12 +75,12 @@
             <input id="taskDue" type="date" class="w-full rounded-lg border border-slate-600 bg-slate-900/30 px-4 py-2 text-slate-100 focus:border-board-accent focus:outline-none" />
           </div>
         </div>
-        <div class="grid gap-2">
+        <div class="grid gap-3">
           <div class="flex items-center justify-between">
             <label class="text-sm font-semibold text-slate-200">子タスク</label>
             <button id="addSubtaskBtn" type="button" class="text-sm text-board-accent hover:text-sky-300">＋ 子タスクを追加</button>
           </div>
-          <div id="subtaskList" class="space-y-2"></div>
+          <div id="subtaskBoard" class="flex flex-col gap-4 overflow-x-auto pb-1 sm:flex-row sm:flex-nowrap"></div>
         </div>
         <div class="flex items-center justify-end gap-3 border-t border-slate-700 pt-4">
           <button type="button" id="deleteTaskBtn" class="mr-auto text-sm text-red-400 hover:text-red-300">タスクを削除</button>
@@ -92,12 +92,14 @@
   </div>
 
   <!-- Subtask inline editor template -->
-  <template id="subtaskTemplate">
-    <div class="flex items-center gap-3 rounded-lg border border-slate-700 bg-slate-900/40 px-3 py-2">
-      <input type="checkbox" class="subtask-toggle h-4 w-4 rounded border-slate-500 bg-transparent text-board-accent focus:ring-board-accent" />
-      <input type="text" class="subtask-title w-full rounded-md bg-transparent text-sm text-slate-200 focus:outline-none" />
-      <button type="button" class="remove-subtask text-sm text-slate-500 transition hover:text-red-400">削除</button>
-    </div>
+  <template id="subtaskCardTemplate">
+    <article class="subtask-card group cursor-grab rounded-lg border border-slate-700 bg-slate-900/60 p-3 text-sm shadow-sm transition hover:border-board-accent" draggable="true">
+      <textarea class="subtask-title w-full resize-none bg-transparent text-sm text-slate-200 focus:outline-none" rows="2" placeholder="子タスクの内容"></textarea>
+      <div class="mt-3 flex items-center justify-between text-xs text-slate-500">
+        <span class="status-label"></span>
+        <button type="button" class="remove-subtask rounded-md px-2 py-1 text-xs text-slate-400 transition hover:bg-red-500/20 hover:text-red-300">削除</button>
+      </div>
+    </article>
   </template>
 
   <script>
@@ -108,15 +110,23 @@
       { id: 'done', label: '完了', accent: 'border-purple-500/40' }
     ];
 
+    const subtaskStatuses = [
+      { id: 'todo', label: '未着手', accent: 'border-sky-500/40' },
+      { id: 'in-progress', label: '進行中', accent: 'border-amber-500/40' },
+      { id: 'done', label: '完了', accent: 'border-emerald-500/40' }
+    ];
+
     let tasks = [];
     let dragTaskId = null;
+    let activeSubtasks = [];
+    let dragSubtaskId = null;
 
     const boardEl = document.getElementById('board');
     const taskModalEl = document.getElementById('taskModal');
     const taskForm = document.getElementById('taskForm');
     const taskStatusSelect = document.getElementById('taskStatus');
-    const subtaskListEl = document.getElementById('subtaskList');
-    const subtaskTemplate = document.getElementById('subtaskTemplate');
+    const subtaskBoardEl = document.getElementById('subtaskBoard');
+    const subtaskCardTemplate = document.getElementById('subtaskCardTemplate');
     const modalTitleEl = document.getElementById('modalTitle');
     const modalSubtitleEl = document.getElementById('modalSubtitle');
     const taskIdInput = document.getElementById('taskId');
@@ -133,7 +143,7 @@
       try {
         const raw = localStorage.getItem(STORAGE_KEY);
         if (raw) {
-          tasks = JSON.parse(raw);
+          tasks = JSON.parse(raw).map((task) => normalizeTask(task));
         } else {
           tasks = createSeedTasks();
         }
@@ -157,8 +167,8 @@
           status: 'in-progress',
           dueDate: new Date().toISOString().slice(0, 10),
           subtasks: [
-            { id: crypto.randomUUID(), title: '定量データの再確認', completed: true },
-            { id: crypto.randomUUID(), title: '改善案の叩き台作成', completed: false }
+            { id: crypto.randomUUID(), title: '定量データの再確認', completed: true, status: 'done' },
+            { id: crypto.randomUUID(), title: '改善案の叩き台作成', completed: false, status: 'todo' }
           ]
         },
         {
@@ -168,8 +178,8 @@
           status: 'todo',
           dueDate: '',
           subtasks: [
-            { id: crypto.randomUUID(), title: '現行アプリのスクショ収集', completed: false },
-            { id: crypto.randomUUID(), title: 'パターン整理のMiro作成', completed: false }
+            { id: crypto.randomUUID(), title: '現行アプリのスクショ収集', completed: false, status: 'todo' },
+            { id: crypto.randomUUID(), title: 'パターン整理のMiro作成', completed: false, status: 'in-progress' }
           ]
         },
         {
@@ -187,10 +197,32 @@
           status: 'done',
           dueDate: new Date(Date.now() - 86400000).toISOString().slice(0, 10),
           subtasks: [
-            { id: crypto.randomUUID(), title: 'ログの抽出クエリ調整', completed: true }
+            { id: crypto.randomUUID(), title: 'ログの抽出クエリ調整', completed: true, status: 'done' }
           ]
         }
-      ];
+      ].map((task) => normalizeTask(task));
+    }
+
+    function normalizeTask(task) {
+      const normalized = { ...task };
+      normalized.subtasks = Array.isArray(task.subtasks)
+        ? task.subtasks.map((subtask) => normalizeSubtask(subtask))
+        : [];
+      return normalized;
+    }
+
+    function normalizeSubtask(subtask) {
+      const inferredStatus = subtask.status || (subtask.completed ? 'done' : 'todo');
+      const status = subtaskStatuses.some((item) => item.id === inferredStatus)
+        ? inferredStatus
+        : 'todo';
+
+      return {
+        id: subtask.id || crypto.randomUUID(),
+        title: typeof subtask.title === 'string' ? subtask.title : '',
+        status,
+        completed: Boolean(subtask.completed || status === 'done')
+      };
     }
 
     function renderBoard() {
@@ -343,7 +375,6 @@
 
     function openModal(taskId = null, presetStatus = statuses[0].id) {
       populateStatusSelect();
-      clearSubtasks();
 
       if (taskId) {
         const task = tasks.find((item) => item.id === taskId);
@@ -355,7 +386,7 @@
         taskDescriptionInput.value = task.description || '';
         taskDueInput.value = task.dueDate || '';
         taskStatusSelect.value = task.status;
-        task.subtasks.forEach((subtask) => addSubtaskRow(subtask));
+        activeSubtasks = task.subtasks.map((subtask) => ({ ...normalizeSubtask(subtask) }));
         deleteTaskBtn.classList.remove('hidden');
       } else {
         modalTitleEl.textContent = '新規タスク';
@@ -365,9 +396,12 @@
         taskDescriptionInput.value = '';
         taskDueInput.value = '';
         taskStatusSelect.value = presetStatus;
-        addSubtaskRow();
+        activeSubtasks = [];
+        addNewSubtask();
         deleteTaskBtn.classList.add('hidden');
       }
+
+      renderSubtaskBoard();
 
       taskModalEl.classList.remove('hidden');
       taskModalEl.classList.add('flex');
@@ -376,6 +410,8 @@
     function closeModal() {
       taskModalEl.classList.add('hidden');
       taskModalEl.classList.remove('flex');
+      activeSubtasks = [];
+      dragSubtaskId = null;
     }
 
     function populateStatusSelect() {
@@ -388,26 +424,184 @@
       });
     }
 
-    function addSubtaskRow(subtask = { id: crypto.randomUUID(), title: '', completed: false }) {
-      const fragment = subtaskTemplate.content.cloneNode(true);
-      const container = fragment.querySelector('div');
-      const checkbox = fragment.querySelector('.subtask-toggle');
-      const titleInput = fragment.querySelector('.subtask-title');
-      const removeBtn = fragment.querySelector('.remove-subtask');
+    function renderSubtaskBoard() {
+      subtaskBoardEl.innerHTML = '';
 
-      container.dataset.subtaskId = subtask.id;
-      checkbox.checked = Boolean(subtask.completed);
-      titleInput.value = subtask.title;
+      subtaskStatuses.forEach((status) => {
+        const column = document.createElement('div');
+        column.className = 'flex min-w-[220px] flex-shrink-0 flex-col gap-3 rounded-xl border border-slate-700/60 bg-slate-900/50 p-3 sm:flex-1';
+        column.dataset.status = status.id;
+        if (status.accent) {
+          column.classList.add(status.accent);
+        }
 
-      removeBtn.addEventListener('click', () => {
-        container.remove();
+        column.innerHTML = `
+          <header class="flex items-center justify-between">
+            <div>
+              <h3 class="text-sm font-semibold text-slate-100">${status.label}</h3>
+              <p class="text-[11px] text-slate-500" data-subtask-count></p>
+            </div>
+            <button class="add-subtask rounded-full border border-slate-600 px-2 py-1 text-xs text-slate-300 transition hover:border-slate-400 hover:text-slate-100">追加</button>
+          </header>
+          <div class="space-y-2 min-h-[60px]" data-subtask-list></div>
+        `;
+
+        const listEl = column.querySelector('[data-subtask-list]');
+        const countEl = column.querySelector('[data-subtask-count]');
+        const addBtn = column.querySelector('.add-subtask');
+
+        addBtn.addEventListener('click', () => addNewSubtask(status.id));
+
+        column.addEventListener('dragover', (event) => {
+          event.preventDefault();
+          column.classList.add('border-board-accent');
+        });
+
+        column.addEventListener('dragleave', () => {
+          column.classList.remove('border-board-accent');
+        });
+
+        column.addEventListener('drop', (event) => {
+          event.preventDefault();
+          column.classList.remove('border-board-accent');
+          const sourceId = dragSubtaskId || event.dataTransfer.getData('text/plain');
+          if (!sourceId) return;
+          moveSubtaskToStatus(sourceId, status.id);
+          dragSubtaskId = null;
+          renderSubtaskBoard();
+        });
+
+        const items = activeSubtasks.filter((subtask) => subtask.status === status.id);
+        countEl.textContent = `子タスク: ${items.length}`;
+
+        items.forEach((subtask) => {
+          const card = createSubtaskCard(subtask);
+          listEl.appendChild(card);
+        });
+
+        subtaskBoardEl.appendChild(column);
       });
-
-      subtaskListEl.appendChild(fragment);
     }
 
-    function clearSubtasks() {
-      subtaskListEl.innerHTML = '';
+    function createSubtaskCard(subtask) {
+      const fragment = subtaskCardTemplate.content.cloneNode(true);
+      const card = fragment.querySelector('.subtask-card');
+      const titleInput = fragment.querySelector('.subtask-title');
+      const removeBtn = fragment.querySelector('.remove-subtask');
+      const statusLabel = fragment.querySelector('.status-label');
+
+      card.dataset.subtaskId = subtask.id;
+      titleInput.value = subtask.title;
+      statusLabel.textContent = subtaskStatuses.find((item) => item.id === subtask.status)?.label || '';
+
+      titleInput.addEventListener('input', (event) => {
+        updateSubtask(subtask.id, { title: event.target.value });
+      });
+
+      removeBtn.addEventListener('click', () => {
+        activeSubtasks = activeSubtasks.filter((item) => item.id !== subtask.id);
+        renderSubtaskBoard();
+      });
+
+      card.addEventListener('dragstart', (event) => {
+        dragSubtaskId = subtask.id;
+        event.dataTransfer.effectAllowed = 'move';
+        event.dataTransfer.setData('text/plain', subtask.id);
+        setTimeout(() => card.classList.add('opacity-60'));
+      });
+
+      card.addEventListener('dragend', () => {
+        dragSubtaskId = null;
+        card.classList.remove('opacity-60');
+      });
+
+      card.addEventListener('dragover', (event) => {
+        event.preventDefault();
+        card.classList.add('border-board-accent');
+      });
+
+      card.addEventListener('dragleave', () => {
+        card.classList.remove('border-board-accent');
+      });
+
+      card.addEventListener('drop', (event) => {
+        event.preventDefault();
+        card.classList.remove('border-board-accent');
+        const sourceId = dragSubtaskId || event.dataTransfer.getData('text/plain');
+        if (!sourceId || sourceId === subtask.id) return;
+        reorderSubtasks(sourceId, subtask.id);
+        dragSubtaskId = null;
+        renderSubtaskBoard();
+      });
+
+      return card;
+    }
+
+    function updateSubtask(subtaskId, patch) {
+      activeSubtasks = activeSubtasks.map((subtask) => {
+        if (subtask.id !== subtaskId) return subtask;
+        const updated = { ...subtask, ...patch };
+        if (patch.status) {
+          updated.status = patch.status;
+          updated.completed = updated.status === 'done';
+        }
+        if (typeof patch.title === 'string') {
+          updated.title = patch.title;
+        }
+        return updated;
+      });
+    }
+
+    function addNewSubtask(statusId = 'todo') {
+      const status = subtaskStatuses.some((item) => item.id === statusId) ? statusId : 'todo';
+      const newSubtask = {
+        id: crypto.randomUUID(),
+        title: '',
+        status,
+        completed: status === 'done'
+      };
+      activeSubtasks = [...activeSubtasks, newSubtask];
+      renderSubtaskBoard();
+      requestAnimationFrame(() => {
+        const field = subtaskBoardEl.querySelector(`[data-subtask-id="${newSubtask.id}"] .subtask-title`);
+        if (field) {
+          field.focus();
+        }
+      });
+    }
+
+    function moveSubtaskToStatus(subtaskId, statusId) {
+      if (!subtaskStatuses.some((item) => item.id === statusId)) return;
+      const targetIndex = activeSubtasks.findIndex((subtask) => subtask.id === subtaskId);
+      if (targetIndex < 0) return;
+
+      const moving = {
+        ...activeSubtasks[targetIndex],
+        status: statusId,
+        completed: statusId === 'done'
+      };
+
+      const remaining = activeSubtasks.filter((subtask) => subtask.id !== subtaskId);
+      activeSubtasks = [...remaining, moving];
+    }
+
+    function reorderSubtasks(sourceId, targetId) {
+      const source = activeSubtasks.find((subtask) => subtask.id === sourceId);
+      const target = activeSubtasks.find((subtask) => subtask.id === targetId);
+      if (!source || !target) return;
+
+      const targetStatus = target.status;
+      source.status = targetStatus;
+      source.completed = targetStatus === 'done';
+
+      const sameStatus = activeSubtasks.filter((item) => item.status === targetStatus && item.id !== sourceId);
+      const others = activeSubtasks.filter((item) => item.status !== targetStatus);
+
+      const insertIndex = sameStatus.findIndex((item) => item.id === targetId);
+      const position = insertIndex < 0 ? sameStatus.length : insertIndex;
+      sameStatus.splice(position, 0, { ...source });
+
+      activeSubtasks = [...others, ...sameStatus];
     }
 
     function handleFormSubmit(event) {
@@ -415,11 +609,18 @@
       const id = taskIdInput.value || crypto.randomUUID();
       const existingIndex = tasks.findIndex((task) => task.id === id);
 
-      const subtasks = Array.from(subtaskListEl.querySelectorAll('[data-subtask-id]')).map((row) => ({
-        id: row.dataset.subtaskId,
-        title: row.querySelector('.subtask-title').value.trim(),
-        completed: row.querySelector('.subtask-toggle').checked
-      })).filter((subtask) => subtask.title.length > 0);
+      const subtasks = activeSubtasks
+        .map((subtask) => ({
+          ...subtask,
+          title: subtask.title.trim()
+        }))
+        .filter((subtask) => subtask.title.length > 0)
+        .map((subtask) => ({
+          id: subtask.id,
+          title: subtask.title,
+          status: subtask.status,
+          completed: subtask.status === 'done'
+        }));
 
       const updatedTask = {
         id,
@@ -496,7 +697,7 @@
       }
     });
 
-    document.getElementById('addSubtaskBtn').addEventListener('click', () => addSubtaskRow());
+    document.getElementById('addSubtaskBtn').addEventListener('click', () => addNewSubtask());
     cancelBtn.addEventListener('click', closeModal);
     closeModalBtn.addEventListener('click', closeModal);
     deleteTaskBtn.addEventListener('click', handleDeleteTask);
