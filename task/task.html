@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TaskFlow Board</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            board: {
+              bg: '#0f172a',
+              card: '#1e293b',
+              accent: '#38bdf8',
+              accentSoft: 'rgba(56, 189, 248, 0.15)'
+            }
+          }
+        }
+      }
+    };
+  </script>
+</head>
+<body class="min-h-screen bg-board-bg text-slate-100">
+  <div class="max-w-7xl mx-auto px-4 py-10">
+    <header class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+      <div>
+        <h1 class="text-3xl font-bold tracking-tight">TaskFlow Board</h1>
+        <p class="text-slate-400">簡易版のJIRA風タスク管理アプリ。ドラッグ&ドロップで整理し、詳細はクリックで確認できます。</p>
+      </div>
+      <div class="flex flex-col items-start gap-3 sm:flex-row sm:items-center">
+        <button id="newTaskBtn" class="flex items-center gap-2 rounded-lg bg-board-accent px-4 py-2 font-medium text-slate-900 shadow transition hover:bg-sky-400">
+          <span class="text-lg">＋</span>
+          <span>タスクを作成</span>
+        </button>
+        <button id="clearBoardBtn" class="rounded-lg border border-slate-600 px-4 py-2 text-sm text-slate-300 transition hover:border-slate-400 hover:text-slate-100">
+          すべてリセット
+        </button>
+      </div>
+    </header>
+
+    <main id="board" class="mt-10 grid gap-6 sm:grid-cols-2 xl:grid-cols-4"></main>
+  </div>
+
+  <!-- Task Detail / Edit Modal -->
+  <div id="taskModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-900/80 backdrop-blur">
+    <div class="w-full max-w-2xl rounded-2xl bg-board-card shadow-xl">
+      <div class="flex items-start justify-between border-b border-slate-700 px-6 py-4">
+        <div>
+          <h2 id="modalTitle" class="text-xl font-semibold"></h2>
+          <p class="text-sm text-slate-400" id="modalSubtitle"></p>
+        </div>
+        <button id="closeModalBtn" class="rounded-full p-1 text-slate-400 transition hover:bg-slate-700 hover:text-slate-100">
+          <span class="text-xl">×</span>
+        </button>
+      </div>
+      <form id="taskForm" class="grid gap-5 px-6 py-6">
+        <input type="hidden" id="taskId" />
+        <div class="grid gap-2">
+          <label for="taskTitle" class="text-sm font-semibold text-slate-200">タイトル</label>
+          <input id="taskTitle" type="text" required placeholder="例: ユーザー登録フローの改善" class="w-full rounded-lg border border-slate-600 bg-slate-900/30 px-4 py-2 text-slate-100 focus:border-board-accent focus:outline-none" />
+        </div>
+        <div class="grid gap-2">
+          <label for="taskDescription" class="text-sm font-semibold text-slate-200">詳細</label>
+          <textarea id="taskDescription" rows="3" placeholder="課題の背景やTODOを記載" class="w-full rounded-lg border border-slate-600 bg-slate-900/30 px-4 py-2 text-slate-100 focus:border-board-accent focus:outline-none"></textarea>
+        </div>
+        <div class="grid gap-4 md:grid-cols-2">
+          <div class="grid gap-2">
+            <label for="taskStatus" class="text-sm font-semibold text-slate-200">ステータス</label>
+            <select id="taskStatus" class="w-full rounded-lg border border-slate-600 bg-slate-900/30 px-4 py-2 text-slate-100 focus:border-board-accent focus:outline-none"></select>
+          </div>
+          <div class="grid gap-2">
+            <label for="taskDue" class="text-sm font-semibold text-slate-200">期限（任意）</label>
+            <input id="taskDue" type="date" class="w-full rounded-lg border border-slate-600 bg-slate-900/30 px-4 py-2 text-slate-100 focus:border-board-accent focus:outline-none" />
+          </div>
+        </div>
+        <div class="grid gap-2">
+          <div class="flex items-center justify-between">
+            <label class="text-sm font-semibold text-slate-200">子タスク</label>
+            <button id="addSubtaskBtn" type="button" class="text-sm text-board-accent hover:text-sky-300">＋ 子タスクを追加</button>
+          </div>
+          <div id="subtaskList" class="space-y-2"></div>
+        </div>
+        <div class="flex items-center justify-end gap-3 border-t border-slate-700 pt-4">
+          <button type="button" id="deleteTaskBtn" class="mr-auto text-sm text-red-400 hover:text-red-300">タスクを削除</button>
+          <button type="button" id="cancelBtn" class="rounded-lg border border-slate-600 px-4 py-2 text-sm text-slate-300 transition hover:border-slate-400 hover:text-slate-100">キャンセル</button>
+          <button type="submit" class="rounded-lg bg-board-accent px-5 py-2 font-semibold text-slate-900 transition hover:bg-sky-400">保存</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Subtask inline editor template -->
+  <template id="subtaskTemplate">
+    <div class="flex items-center gap-3 rounded-lg border border-slate-700 bg-slate-900/40 px-3 py-2">
+      <input type="checkbox" class="subtask-toggle h-4 w-4 rounded border-slate-500 bg-transparent text-board-accent focus:ring-board-accent" />
+      <input type="text" class="subtask-title w-full rounded-md bg-transparent text-sm text-slate-200 focus:outline-none" />
+      <button type="button" class="remove-subtask text-sm text-slate-500 transition hover:text-red-400">削除</button>
+    </div>
+  </template>
+
+  <script>
+    const statuses = [
+      { id: 'backlog', label: 'バックログ', accent: 'border-sky-500/40' },
+      { id: 'todo', label: 'To Do', accent: 'border-emerald-500/40' },
+      { id: 'in-progress', label: '進行中', accent: 'border-amber-500/40' },
+      { id: 'done', label: '完了', accent: 'border-purple-500/40' }
+    ];
+
+    let tasks = [];
+    let dragTaskId = null;
+
+    const boardEl = document.getElementById('board');
+    const taskModalEl = document.getElementById('taskModal');
+    const taskForm = document.getElementById('taskForm');
+    const taskStatusSelect = document.getElementById('taskStatus');
+    const subtaskListEl = document.getElementById('subtaskList');
+    const subtaskTemplate = document.getElementById('subtaskTemplate');
+    const modalTitleEl = document.getElementById('modalTitle');
+    const modalSubtitleEl = document.getElementById('modalSubtitle');
+    const taskIdInput = document.getElementById('taskId');
+    const taskTitleInput = document.getElementById('taskTitle');
+    const taskDescriptionInput = document.getElementById('taskDescription');
+    const taskDueInput = document.getElementById('taskDue');
+    const cancelBtn = document.getElementById('cancelBtn');
+    const closeModalBtn = document.getElementById('closeModalBtn');
+    const deleteTaskBtn = document.getElementById('deleteTaskBtn');
+
+    const STORAGE_KEY = 'taskflow-board';
+
+    function loadTasks() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (raw) {
+          tasks = JSON.parse(raw);
+        } else {
+          tasks = createSeedTasks();
+        }
+      } catch (error) {
+        console.error('Failed to parse tasks from storage', error);
+        tasks = createSeedTasks();
+      }
+    }
+
+    function saveTasks() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
+    }
+
+    function createSeedTasks() {
+      return [
+        {
+          id: crypto.randomUUID(),
+          title: 'ユーザー登録フローの改善',
+          description: '離脱率の高いステップを洗い出し、入力項目を整理する。'
+            + '\n- 現状の分析レポート確認\n- ヒアリング実施',
+          status: 'in-progress',
+          dueDate: new Date().toISOString().slice(0, 10),
+          subtasks: [
+            { id: crypto.randomUUID(), title: '定量データの再確認', completed: true },
+            { id: crypto.randomUUID(), title: '改善案の叩き台作成', completed: false }
+          ]
+        },
+        {
+          id: crypto.randomUUID(),
+          title: 'モバイルUIコンポーネントの棚卸し',
+          description: 'デザインシステム未対応のモジュールを洗い出し、優先度順に並べる。',
+          status: 'todo',
+          dueDate: '',
+          subtasks: [
+            { id: crypto.randomUUID(), title: '現行アプリのスクショ収集', completed: false },
+            { id: crypto.randomUUID(), title: 'パターン整理のMiro作成', completed: false }
+          ]
+        },
+        {
+          id: crypto.randomUUID(),
+          title: '開発環境のCIジョブ整備',
+          description: 'lint/test/buildのワークフローを分離し高速化する。',
+          status: 'backlog',
+          dueDate: '',
+          subtasks: []
+        },
+        {
+          id: crypto.randomUUID(),
+          title: '通知機能のABテスト分析',
+          description: 'Push通知を開封したユーザーの行動ログを比較し指標化。',
+          status: 'done',
+          dueDate: new Date(Date.now() - 86400000).toISOString().slice(0, 10),
+          subtasks: [
+            { id: crypto.randomUUID(), title: 'ログの抽出クエリ調整', completed: true }
+          ]
+        }
+      ];
+    }
+
+    function renderBoard() {
+      boardEl.innerHTML = '';
+
+      statuses.forEach((status) => {
+        const column = document.createElement('section');
+        column.className = 'flex h-full flex-col rounded-2xl border border-slate-700/60 bg-slate-900/40 backdrop-blur-sm';
+        column.dataset.status = status.id;
+
+        column.innerHTML = `
+          <header class="flex items-center justify-between border-b border-slate-700/70 px-5 py-4">
+            <div>
+              <h2 class="font-semibold text-slate-100">${status.label}</h2>
+              <p class="text-xs text-slate-500" data-task-count></p>
+            </div>
+            <button class="add-task inline-flex items-center justify-center rounded-full border border-slate-600 px-2 py-1 text-xs text-slate-300 transition hover:border-slate-400 hover:text-slate-100">追加</button>
+          </header>
+          <div class="flex-1 space-y-3 overflow-y-auto px-5 py-4" data-task-list></div>
+        `;
+
+        const listEl = column.querySelector('[data-task-list]');
+        const countEl = column.querySelector('[data-task-count]');
+        const addBtn = column.querySelector('.add-task');
+
+        addBtn.addEventListener('click', () => openModal(null, status.id));
+
+        column.addEventListener('dragover', (event) => {
+          event.preventDefault();
+          column.classList.add('border-board-accent');
+        });
+
+        column.addEventListener('dragleave', () => {
+          column.classList.remove('border-board-accent');
+        });
+
+        column.addEventListener('drop', (event) => {
+          event.preventDefault();
+          column.classList.remove('border-board-accent');
+          if (!dragTaskId) return;
+          const targetStatus = column.dataset.status;
+          moveTaskToStatus(dragTaskId, targetStatus);
+          dragTaskId = null;
+          renderBoard();
+          saveTasks();
+        });
+
+        const statusTasks = tasks.filter((task) => task.status === status.id);
+        countEl.textContent = `タスク: ${statusTasks.length}`;
+
+        statusTasks.forEach((task) => {
+          const taskEl = createTaskCard(task);
+          listEl.appendChild(taskEl);
+        });
+
+        boardEl.appendChild(column);
+      });
+    }
+
+    function createTaskCard(task) {
+      const card = document.createElement('article');
+      card.className = 'group rounded-xl border border-slate-700/70 bg-board-card/80 p-4 shadow transition hover:border-board-accent hover:bg-board-card';
+      card.draggable = true;
+      card.dataset.taskId = task.id;
+
+      const completedCount = task.subtasks.filter((st) => st.completed).length;
+      const dueLabel = task.dueDate ? new Date(task.dueDate) : null;
+
+      card.innerHTML = `
+        <div class="flex items-start justify-between gap-3">
+          <h3 class="text-lg font-semibold text-slate-100">${escapeHtml(task.title)}</h3>
+          <button class="open-modal hidden rounded-md bg-board-accent/20 px-2 py-1 text-xs text-board-accent transition group-hover:inline-flex group-hover:items-center group-hover:gap-1 group-hover:bg-board-accent/30 group-hover:text-slate-100">詳細</button>
+        </div>
+        ${task.description ? `<p class="mt-2 max-h-16 overflow-hidden whitespace-pre-line text-sm text-slate-400">${escapeHtml(task.description)}</p>` : ''}
+        <div class="mt-4 flex flex-wrap items-center gap-2 text-xs text-slate-400">
+          ${task.dueDate ? `<span class="flex items-center gap-1 rounded-full border border-slate-600/70 px-2 py-1 ${isOverdue(task.dueDate) ? 'text-red-300 border-red-400/40' : 'text-slate-300'}">📅 ${formatDateLabel(dueLabel)}</span>` : '<span class="rounded-full border border-slate-700/70 px-2 py-1">期限なし</span>'}
+          <span class="rounded-full border border-slate-700/70 px-2 py-1">子タスク ${completedCount}/${task.subtasks.length}</span>
+        </div>
+      `;
+
+      card.addEventListener('click', (event) => {
+        if (event.target.closest('.open-modal')) {
+          openModal(task.id);
+        } else if (!event.target.closest('button')) {
+          openModal(task.id);
+        }
+      });
+
+      card.addEventListener('dragstart', (event) => {
+        dragTaskId = task.id;
+        event.dataTransfer.effectAllowed = 'move';
+        event.dataTransfer.setData('text/plain', task.id);
+        setTimeout(() => card.classList.add('opacity-50'));
+      });
+
+      card.addEventListener('dragend', () => {
+        dragTaskId = null;
+        card.classList.remove('opacity-50');
+      });
+
+      card.addEventListener('dragover', (event) => {
+        event.preventDefault();
+        card.classList.add('border-board-accent');
+      });
+
+      card.addEventListener('dragleave', () => {
+        card.classList.remove('border-board-accent');
+      });
+
+      card.addEventListener('drop', (event) => {
+        event.preventDefault();
+        card.classList.remove('border-board-accent');
+        const sourceId = dragTaskId || event.dataTransfer.getData('text/plain');
+        if (!sourceId || sourceId === task.id) return;
+        reorderTasks(sourceId, task.id);
+        dragTaskId = null;
+        renderBoard();
+        saveTasks();
+      });
+
+      return card;
+    }
+
+    function reorderTasks(sourceId, targetId) {
+      const sourceTask = tasks.find((task) => task.id === sourceId);
+      const targetTask = tasks.find((task) => task.id === targetId);
+      if (!sourceTask || !targetTask) return;
+
+      sourceTask.status = targetTask.status;
+
+      const filtered = tasks.filter((task) => task.status === targetTask.status);
+      const others = tasks.filter((task) => task.status !== targetTask.status);
+
+      const withoutSource = filtered.filter((task) => task.id !== sourceId);
+      const targetIndex = withoutSource.findIndex((task) => task.id === targetId);
+      withoutSource.splice(targetIndex, 0, sourceTask);
+
+      tasks = [...others, ...withoutSource];
+    }
+
+    function moveTaskToStatus(taskId, statusId) {
+      const task = tasks.find((item) => item.id === taskId);
+      if (!task) return;
+      task.status = statusId;
+
+      tasks = tasks.filter((item) => item.id !== taskId);
+      tasks.push(task);
+      tasks = [...tasks];
+    }
+
+    function openModal(taskId = null, presetStatus = statuses[0].id) {
+      populateStatusSelect();
+      clearSubtasks();
+
+      if (taskId) {
+        const task = tasks.find((item) => item.id === taskId);
+        if (!task) return;
+        modalTitleEl.textContent = 'タスク詳細';
+        modalSubtitleEl.textContent = '内容を編集できます';
+        taskIdInput.value = task.id;
+        taskTitleInput.value = task.title;
+        taskDescriptionInput.value = task.description || '';
+        taskDueInput.value = task.dueDate || '';
+        taskStatusSelect.value = task.status;
+        task.subtasks.forEach((subtask) => addSubtaskRow(subtask));
+        deleteTaskBtn.classList.remove('hidden');
+      } else {
+        modalTitleEl.textContent = '新規タスク';
+        modalSubtitleEl.textContent = '必要な情報を入力してください';
+        taskIdInput.value = '';
+        taskTitleInput.value = '';
+        taskDescriptionInput.value = '';
+        taskDueInput.value = '';
+        taskStatusSelect.value = presetStatus;
+        addSubtaskRow();
+        deleteTaskBtn.classList.add('hidden');
+      }
+
+      taskModalEl.classList.remove('hidden');
+      taskModalEl.classList.add('flex');
+    }
+
+    function closeModal() {
+      taskModalEl.classList.add('hidden');
+      taskModalEl.classList.remove('flex');
+    }
+
+    function populateStatusSelect() {
+      taskStatusSelect.innerHTML = '';
+      statuses.forEach((status) => {
+        const option = document.createElement('option');
+        option.value = status.id;
+        option.textContent = status.label;
+        taskStatusSelect.appendChild(option);
+      });
+    }
+
+    function addSubtaskRow(subtask = { id: crypto.randomUUID(), title: '', completed: false }) {
+      const fragment = subtaskTemplate.content.cloneNode(true);
+      const container = fragment.querySelector('div');
+      const checkbox = fragment.querySelector('.subtask-toggle');
+      const titleInput = fragment.querySelector('.subtask-title');
+      const removeBtn = fragment.querySelector('.remove-subtask');
+
+      container.dataset.subtaskId = subtask.id;
+      checkbox.checked = Boolean(subtask.completed);
+      titleInput.value = subtask.title;
+
+      removeBtn.addEventListener('click', () => {
+        container.remove();
+      });
+
+      subtaskListEl.appendChild(fragment);
+    }
+
+    function clearSubtasks() {
+      subtaskListEl.innerHTML = '';
+    }
+
+    function handleFormSubmit(event) {
+      event.preventDefault();
+      const id = taskIdInput.value || crypto.randomUUID();
+      const existingIndex = tasks.findIndex((task) => task.id === id);
+
+      const subtasks = Array.from(subtaskListEl.querySelectorAll('[data-subtask-id]')).map((row) => ({
+        id: row.dataset.subtaskId,
+        title: row.querySelector('.subtask-title').value.trim(),
+        completed: row.querySelector('.subtask-toggle').checked
+      })).filter((subtask) => subtask.title.length > 0);
+
+      const updatedTask = {
+        id,
+        title: taskTitleInput.value.trim(),
+        description: taskDescriptionInput.value.trim(),
+        status: taskStatusSelect.value,
+        dueDate: taskDueInput.value,
+        subtasks
+      };
+
+      if (!updatedTask.title) {
+        alert('タイトルを入力してください');
+        return;
+      }
+
+      if (existingIndex >= 0) {
+        tasks[existingIndex] = updatedTask;
+      } else {
+        tasks.push(updatedTask);
+      }
+
+      saveTasks();
+      renderBoard();
+      closeModal();
+    }
+
+    function handleDeleteTask() {
+      const id = taskIdInput.value;
+      if (!id) {
+        closeModal();
+        return;
+      }
+      if (confirm('このタスクを削除しますか？')) {
+        tasks = tasks.filter((task) => task.id !== id);
+        saveTasks();
+        renderBoard();
+        closeModal();
+      }
+    }
+
+    function escapeHtml(text) {
+      if (typeof text !== 'string') return '';
+      return text.replace(/[&<>"']/g, (char) => {
+        const map = {
+          '&': '&amp;',
+          '<': '&lt;',
+          '>': '&gt;',
+          '"': '&quot;',
+          "'": '&#39;'
+        };
+        return map[char];
+      });
+    }
+
+    function formatDateLabel(date) {
+      if (!(date instanceof Date) || Number.isNaN(date.getTime())) return '日付不明';
+      return `${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日`;
+    }
+
+    function isOverdue(dateString) {
+      if (!dateString) return false;
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const compare = new Date(dateString);
+      return compare < today;
+    }
+
+    document.getElementById('newTaskBtn').addEventListener('click', () => openModal());
+    document.getElementById('clearBoardBtn').addEventListener('click', () => {
+      if (confirm('すべてのタスクを初期状態に戻しますか？')) {
+        tasks = createSeedTasks();
+        saveTasks();
+        renderBoard();
+      }
+    });
+
+    document.getElementById('addSubtaskBtn').addEventListener('click', () => addSubtaskRow());
+    cancelBtn.addEventListener('click', closeModal);
+    closeModalBtn.addEventListener('click', closeModal);
+    deleteTaskBtn.addEventListener('click', handleDeleteTask);
+
+    taskForm.addEventListener('submit', handleFormSubmit);
+
+    window.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && !taskModalEl.classList.contains('hidden')) {
+        closeModal();
+      }
+    });
+
+    taskModalEl.addEventListener('click', (event) => {
+      if (event.target === taskModalEl) {
+        closeModal();
+      }
+    });
+
+    loadTasks();
+    renderBoard();
+  </script>
+</body>
+</html>
