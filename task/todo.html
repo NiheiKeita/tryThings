@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>JIRA風タスク管理（赤テーマ・HTML1ファイル）</title>
+  <!-- TailwindCSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- SortableJS（ドラッグ＆ドロップ） -->
+  <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
+  <style>
+    .sticky-col-title { position: sticky; top: 0; z-index: 10; }
+    dialog::backdrop { background: rgba(0,0,0,.4); }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-900">
+  <!-- ヘッダ -->
+  <header class="px-4 sm:px-6 lg:px-8 py-4 border-b bg-white">
+    <div class="max-w-7xl mx-auto flex items-center gap-3">
+      <h1 class="text-xl sm:text-2xl font-bold tracking-tight text-red-700">JIRA風タスク管理</h1>
+      <button id="btnNewTask" class="ml-auto inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold bg-red-600 text-white hover:bg-red-700 shadow">
+        ＋ 新規タスク
+      </button>
+      <button id="btnExport" class="inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold bg-slate-200 text-slate-800 hover:bg-slate-300">
+        エクスポート
+      </button>
+      <button id="btnImport" class="inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold bg-slate-200 text-slate-800 hover:bg-slate-300">
+        インポート
+      </button>
+      <input id="importFile" type="file" accept="application/json" class="hidden" />
+    </div>
+  </header>
+
+  <!-- メイン（カンバン） -->
+  <main class="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <!-- Backlog -->
+      <section data-status="backlog" class="bg-white rounded-2xl shadow-sm border">
+        <div class="sticky-col-title bg-white p-3 border-b rounded-t-2xl flex items-center justify-between">
+          <h2 class="font-semibold">Backlog</h2>
+          <span class="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-600" data-count="backlog">0</span>
+        </div>
+        <div id="list-backlog" class="min-h-[200px] max-h-[70vh] overflow-auto p-3 space-y-3"></div>
+      </section>
+
+      <!-- In Progress -->
+      <section data-status="inprogress" class="bg-white rounded-2xl shadow-sm border">
+        <div class="sticky-col-title bg-white p-3 border-b rounded-t-2xl flex items-center justify-between">
+          <h2 class="font-semibold">In Progress</h2>
+          <span class="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-600" data-count="inprogress">0</span>
+        </div>
+        <div id="list-inprogress" class="min-h-[200px] max-h-[70vh] overflow-auto p-3 space-y-3"></div>
+      </section>
+
+      <!-- Review -->
+      <section data-status="review" class="bg-white rounded-2xl shadow-sm border">
+        <div class="sticky-col-title bg-white p-3 border-b rounded-t-2xl flex items-center justify-between">
+          <h2 class="font-semibold">Review</h2>
+          <span class="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-600" data-count="review">0</span>
+        </div>
+        <div id="list-review" class="min-h-[200px] max-h-[70vh] overflow-auto p-3 space-y-3"></div>
+      </section>
+
+      <!-- Done -->
+      <section data-status="done" class="bg-white rounded-2xl shadow-sm border">
+        <div class="sticky-col-title bg-white p-3 border-b rounded-t-2xl flex items-center justify-between">
+          <h2 class="font-semibold">Done</h2>
+          <span class="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-600" data-count="done">0</span>
+        </div>
+        <div id="list-done" class="min-h-[200px] max-h-[70vh] overflow-auto p-3 space-y-3"></div>
+      </section>
+    </div>
+  </main>
+
+  <!-- タスク詳細モーダル -->
+  <dialog id="taskModal" class="w-[min(800px,92vw)] rounded-2xl p-0">
+    <form method="dialog" class="p-0 m-0">
+      <header class="p-4 border-b flex items-center gap-3">
+        <h3 id="modalTitle" class="text-lg font-semibold">タスク</h3>
+        <button id="btnDeleteTask" type="button" class="ml-auto text-red-600 hover:text-red-700 text-sm">削除</button>
+        <button id="btnCloseModal" class="rounded-lg px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-sm">閉じる</button>
+      </header>
+      <div class="p-4 space-y-4">
+        <input type="hidden" id="taskId" />
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <label class="block">
+            <span class="text-sm font-medium">タイトル</span>
+            <input id="taskTitle" class="mt-1 w-full rounded-xl border px-3 py-2" placeholder="例: ログイン画面のUI作成" />
+          </label>
+          <label class="block">
+            <span class="text-sm font-medium">ステータス</span>
+            <select id="taskStatus" class="mt-1 w-full rounded-xl border px-3 py-2">
+              <option value="backlog">Backlog</option>
+              <option value="inprogress">In Progress</option>
+              <option value="review">Review</option>
+              <option value="done">Done</option>
+            </select>
+          </label>
+        </div>
+
+        <label class="block">
+          <span class="text-sm font-medium">詳細</span>
+          <textarea id="taskDesc" class="mt-1 w-full rounded-xl border px-3 py-2 min-h-[96px]" placeholder="補足情報や受け入れ条件など"></textarea>
+        </label>
+
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <label class="block">
+            <span class="text-sm font-medium">開始日（任意）</span>
+            <input id="taskDueStart" type="date" class="mt-1 w-full rounded-xl border px-3 py-2" />
+          </label>
+          <label class="block">
+            <span class="text-sm font-medium">終了日（任意）</span>
+            <input id="taskDueEnd" type="date" class="mt-1 w-full rounded-xl border px-3 py-2" />
+          </label>
+          <div class="flex items-end">
+            <button id="btnClearDue" type="button" class="rounded-xl px-3 py-2 bg-slate-100 hover:bg-slate-200 text-sm">期限クリア</button>
+          </div>
+        </div>
+
+        <!-- 子タスク -->
+        <section class="border rounded-2xl p-3">
+          <div class="flex items-center justify-between">
+            <h4 class="font-semibold">子タスク</h4>
+            <div class="flex gap-2">
+              <input id="subtaskInput" class="w-48 rounded-xl border px-3 py-1.5 text-sm" placeholder="子タスク名" />
+              <button id="btnAddSubtask" type="button" class="rounded-xl px-3 py-1.5 bg-red-600 text-white text-sm hover:bg-red-700">追加</button>
+            </div>
+          </div>
+          <ul id="subtaskList" class="mt-3 space-y-2"></ul>
+        </section>
+
+        <div class="pt-2 flex justify-end">
+          <button id="btnSaveTask" type="button" class="rounded-xl px-4 py-2 bg-red-600 text-white font-semibold hover:bg-red-700">保存</button>
+        </div>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- 新規作成（クイック）モーダル -->
+  <dialog id="quickModal" class="w-[min(560px,92vw)] rounded-2xl p-0">
+    <form method="dialog" class="p-0 m-0">
+      <header class="p-4 border-b flex items-center gap-3">
+        <h3 class="text-lg font-semibold">新規タスク</h3>
+        <button id="btnCloseQuick" class="ml-auto rounded-lg px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-sm">閉じる</button>
+      </header>
+      <div class="p-4 space-y-3">
+        <label class="block">
+          <span class="text-sm font-medium">タイトル</span>
+          <input id="quickTitle" class="mt-1 w-full rounded-xl border px-3 py-2" placeholder="何をする？" />
+        </label>
+        <label class="block">
+          <span class="text-sm font-medium">ステータス</span>
+          <select id="quickStatus" class="mt-1 w-full rounded-xl border px-3 py-2">
+            <option value="backlog">Backlog</option>
+            <option value="inprogress">In Progress</option>
+            <option value="review">Review</option>
+            <option value="done">Done</option>
+          </select>
+        </label>
+        <div class="flex justify-end pt-1">
+          <button id="btnCreateQuick" type="button" class="rounded-xl px-4 py-2 bg-red-600 text-white font-semibold hover:bg-red-700">作成</button>
+        </div>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- タスクカードテンプレート -->
+  <template id="tpl-task">
+    <article class="task-card rounded-xl border bg-white shadow-sm hover:shadow transition cursor-pointer">
+      <div class="p-3 space-y-2">
+        <div class="flex items-start gap-2">
+          <div class="mt-0.5 shrink-0 h-2 w-2 rounded-full bg-slate-300" data-color></div>
+          <h3 class="font-semibold leading-tight line-clamp-2" data-title></h3>
+        </div>
+        <div class="flex items-center gap-2 text-xs text-slate-600" data-meta></div>
+        <div class="flex items-center justify-between">
+          <span class="text-[11px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-700" data-subprogress></span>
+          <span class="text-[11px] px-2 py-0.5 rounded-full" data-duebadge></span>
+        </div>
+      </div>
+    </article>
+  </template>
+
+  <script>
+  // ------------------------------
+  // モデル
+  // ------------------------------
+  const STORAGE_KEY = "jira_like_tasks_v1";
+
+  /** @type {Array<{id:string,title:string,desc:string,status:'backlog'|'inprogress'|'review'|'done',dueStart?:string,dueEnd?:string,subtasks:Array<{id:string,title:string,done:boolean}>,order:number}>} */
+  let tasks = [];
+
+  const statuses = ["backlog","inprogress","review","done"];
+  const statusToListId = {
+    backlog: "list-backlog",
+    inprogress: "list-inprogress",
+    review: "list-review",
+    done: "list-done",
+  };
+
+  // ------------------------------
+  // ユーティリティ
+  // ------------------------------
+  const uid = () => Math.random().toString(36).slice(2, 10);
+  const save = () => localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
+  const load = () => {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      tasks = raw ? JSON.parse(raw) : seed();
+    } catch {
+      tasks = seed();
+    }
+  };
+  const seed = () => {
+    const today = new Date().toISOString().slice(0,10);
+    return [
+      { id: uid(), title: "プロジェクト雛形を作成", desc: "技術選定: Tailwind + SortableJS。README用スクショも", status: "backlog", dueStart: today, dueEnd: "", subtasks: [{id:uid(),title:"README雛形",done:false}], order: 0 },
+      { id: uid(), title: "ログインUIデザイン", desc: "Figmaで画面ラフ。スマホ優先で", status: "inprogress", dueStart: "", dueEnd: "", subtasks: [{id:uid(),title:"モバイル版",done:true},{id:uid(),title:"デスクトップ版",done:false}], order: 0 },
+      { id: uid(), title: "コードレビュー方針の草案", desc: "PRテンプレートの作成、レビューポリシー", status: "review", dueStart: "", dueEnd: today, subtasks: [], order: 0 },
+      { id: uid(), title: "GitHub ActionsでLint", desc: "push時にESLint実行", status: "done", dueStart: "", dueEnd: today, subtasks: [{id:uid(),title:"ワークフロー作成",done:true}], order: 0 },
+    ];
+  };
+
+  const getById = (id) => tasks.find(t => t.id === id);
+
+  const formatDueBadge = (t) => {
+    const s = t.dueStart, e = t.dueEnd;
+    if (!s && !e) return "";
+    if (s && e) return `${s}〜${e}`;
+    return s ? `${s}〜` : `〜${e}`;
+  };
+
+  const dueBadgeClass = (t) => {
+    const e = t.dueEnd;
+    if (!e) return "bg-slate-100 text-slate-700";
+    const today = new Date().toISOString().slice(0,10);
+    if (e < today && t.status !== "done") return "bg-red-100 text-red-700";
+    if (e === today && t.status !== "done") return "bg-amber-100 text-amber-700";
+    return "bg-emerald-100 text-emerald-700";
+  };
+
+  const subProgressText = (t) => {
+    const total = t.subtasks.length;
+    const done = t.subtasks.filter(s=>s.done).length;
+    return total ? `子: ${done}/${total}` : "子: 0/0";
+  };
+
+  // ------------------------------
+  // レンダリング
+  // ------------------------------
+  function render() {
+    // クリア
+    for (const st of statuses) {
+      const el = document.getElementById(statusToListId[st]);
+      el.innerHTML = "";
+    }
+    // order順で各列へ
+    for (const st of statuses) {
+      const list = tasks.filter(t => t.status === st).sort((a,b)=>a.order-b.order);
+      for (const t of list) {
+        const card = renderTaskCard(t);
+        document.getElementById(statusToListId[st]).appendChild(card);
+      }
+      document.querySelector(`[data-count="${st}"]`).textContent = list.length;
+    }
+  }
+
+  function renderTaskCard(t) {
+    const tpl = document.getElementById("tpl-task");
+    const node = tpl.content.firstElementChild.cloneNode(true);
+
+    node.dataset.id = t.id;
+    node.querySelector("[data-title]").textContent = t.title;
+
+    // ステータス色点
+    const colorDot = node.querySelector("[data-color]");
+    colorDot.classList.remove("bg-slate-300","bg-red-400","bg-amber-400","bg-emerald-400");
+    const colorByStatus = {
+      backlog: "bg-slate-300",
+      inprogress: "bg-red-400",   // 赤テーマに合わせて進行中は赤系
+      review: "bg-amber-400",
+      done: "bg-emerald-400"
+    };
+    colorDot.classList.add(colorByStatus[t.status] || "bg-slate-300");
+
+    // メタ（ステータスラベル）
+    const meta = node.querySelector("[data-meta]");
+    meta.innerHTML = `<span class="text-[11px] px-2 py-0.5 rounded-full bg-slate-100">${t.status}</span>`;
+
+    // 子タスク進捗
+    node.querySelector("[data-subprogress]").textContent = subProgressText(t);
+
+    // 期限バッジ
+    const dueBadge = node.querySelector("[data-duebadge]");
+    const dueLabel = formatDueBadge(t);
+    if (dueLabel) {
+      dueBadge.textContent = dueLabel;
+      dueBadge.className = "text-[11px] px-2 py-0.5 rounded-full " + dueBadgeClass(t);
+    } else {
+      dueBadge.textContent = "";
+      dueBadge.className = "text-[11px] px-2 py-0.5 rounded-full";
+    }
+
+    // クリックで編集モーダル
+    node.addEventListener("click", () => {
+      // D&D直後の誤爆防止でゼロ遅延
+      setTimeout(()=>openTaskModal(t.id), 0);
+    });
+
+    return node;
+  }
+
+  // ------------------------------
+  // D&D（SortableJS）
+  // ------------------------------
+  function setupDnD() {
+    for (const st of statuses) {
+      const listEl = document.getElementById(statusToListId[st]);
+      new Sortable(listEl, {
+        group: "kanban",
+        animation: 150,
+        ghostClass: "opacity-50",
+        onEnd: (evt) => {
+          const movedId = evt.item.dataset.id;
+          const newListEl = evt.to;
+          const newStatus = Object.entries(statusToListId).find(([k,v]) => v === newListEl.id)?.[0];
+          const movedTask = getById(movedId);
+
+          if (movedTask && newStatus) {
+            movedTask.status = newStatus;
+            // 新しい順序で order を振り直す
+            Array.from(newListEl.querySelectorAll(".task-card")).forEach((el, idx) => {
+              const id = el.dataset.id;
+              const t = getById(id);
+              if (t) t.order = idx;
+            });
+            save();
+            render(); // バッジや色を再設定
+          }
+        }
+      });
+    }
+  }
+
+  // ------------------------------
+  // モーダル制御
+  // ------------------------------
+  const taskModal = document.getElementById("taskModal");
+  const quickModal = document.getElementById("quickModal");
+
+  function openQuickModal() {
+    document.getElementById("quickTitle").value = "";
+    document.getElementById("quickStatus").value = "backlog";
+    quickModal.showModal();
+  }
+  function openTaskModal(taskId) {
+    const elId = document.getElementById("taskId");
+    const titleEl = document.getElementById("taskTitle");
+    const descEl = document.getElementById("taskDesc");
+    const stEl = document.getElementById("taskStatus");
+    const sEl = document.getElementById("taskDueStart");
+    const eEl = document.getElementById("taskDueEnd");
+    const subList = document.getElementById("subtaskList");
+
+    subList.innerHTML = "";
+
+    if (!taskId) {
+      document.getElementById("modalTitle").textContent = "タスクを作成";
+      elId.value = "";
+      titleEl.value = "";
+      descEl.value = "";
+      stEl.value = "backlog";
+      sEl.value = "";
+      eEl.value = "";
+      document.getElementById("btnDeleteTask").classList.add("hidden");
+    } else {
+      const t = getById(taskId);
+      if (!t) return;
+      document.getElementById("modalTitle").textContent = "タスクを編集";
+      elId.value = t.id;
+      titleEl.value = t.title;
+      descEl.value = t.desc || "";
+      stEl.value = t.status;
+      sEl.value = t.dueStart || "";
+      eEl.value = t.dueEnd || "";
+      document.getElementById("btnDeleteTask").classList.remove("hidden");
+      // 子タスク描画
+      for (const s of t.subtasks) subList.appendChild(renderSubtaskItem(t.id, s));
+    }
+    taskModal.showModal();
+  }
+  function closeTaskModal() {
+    taskModal.close();
+  }
+
+  // ------------------------------
+  // 子タスク描画＆操作
+  // ------------------------------
+  function renderSubtaskItem(taskId, sub) {
+    const li = document.createElement("li");
+    li.className = "flex items-center gap-2";
+    li.dataset.sid = sub.id;
+
+    const cb = document.createElement("input");
+    cb.type = "checkbox";
+    cb.checked = sub.done;
+    cb.className = "h-4 w-4";
+    cb.addEventListener("change", () => {
+      const t = getById(taskId);
+      const s = t?.subtasks.find(x=>x.id===sub.id);
+      if (s) {
+        s.done = cb.checked;
+        save();
+        render();
+      }
+    });
+
+    const span = document.createElement("span");
+    span.className = "text-sm flex-1";
+    span.textContent = sub.title;
+
+    const del = document.createElement("button");
+    del.type = "button";
+    del.className = "text-xs text-slate-500 hover:text-red-600";
+    del.textContent = "削除";
+    del.addEventListener("click", () => {
+      const t = getById(taskId);
+      if (!t) return;
+      t.subtasks = t.subtasks.filter(x=>x.id!==sub.id);
+      save();
+      li.remove();
+      render();
+    });
+
+    li.append(cb, span, del);
+    return li;
+  }
+
+  // ------------------------------
+  // イベント
+  // ------------------------------
+  document.getElementById("btnNewTask").addEventListener("click", openQuickModal);
+  document.getElementById("btnCloseQuick").addEventListener("click", ()=>quickModal.close());
+  document.getElementById("btnCreateQuick").addEventListener("click", ()=>{
+    const title = document.getElementById("quickTitle").value.trim();
+    const status = document.getElementById("quickStatus").value;
+    if (!title) return;
+    const order = tasks.filter(t=>t.status===status).length;
+    tasks.push({ id: uid(), title, desc: "", status, dueStart:"", dueEnd:"", subtasks: [], order });
+    save();
+    render();
+    quickModal.close();
+  });
+
+  document.getElementById("btnCloseModal").addEventListener("click", closeTaskModal);
+
+  document.getElementById("btnSaveTask").addEventListener("click", ()=>{
+    const id = document.getElementById("taskId").value;
+    const title = document.getElementById("taskTitle").value.trim();
+    if (!title) return;
+
+    const desc = document.getElementById("taskDesc").value;
+    const status = document.getElementById("taskStatus").value;
+    const dueStart = document.getElementById("taskDueStart").value;
+    const dueEnd = document.getElementById("taskDueEnd").value;
+
+    if (id) {
+      const t = getById(id);
+      if (!t) return;
+      t.title = title;
+      t.desc = desc;
+      if (t.status !== status) {
+        t.status = status;
+        t.order = tasks.filter(x=>x.status===status).length; // 列移動時は末尾へ
+      }
+      t.dueStart = dueStart || "";
+      t.dueEnd = dueEnd || "";
+    } else {
+      const order = tasks.filter(t=>t.status===status).length;
+      tasks.push({ id: uid(), title, desc, status, dueStart: dueStart || "", dueEnd: dueEnd || "", subtasks: [], order });
+    }
+    save();
+    render();
+    closeTaskModal();
+  });
+
+  document.getElementById("btnDeleteTask").addEventListener("click", ()=>{
+    const id = document.getElementById("taskId").value;
+    if (!id) return;
+    tasks = tasks.filter(t=>t.id !== id);
+    save();
+    render();
+    closeTaskModal();
+  });
+
+  document.getElementById("btnClearDue").addEventListener("click", ()=>{
+    document.getElementById("taskDueStart").value = "";
+    document.getElementById("taskDueEnd").value = "";
+  });
+
+  document.getElementById("btnAddSubtask").addEventListener("click", ()=>{
+    const id = document.getElementById("taskId").value;
+    const t = getById(id);
+    if (!t) return;
+    const input = document.getElementById("subtaskInput");
+    const title = input.value.trim();
+    if (!title) return;
+    const s = { id: uid(), title, done: false };
+    t.subtasks.push(s);
+    save();
+    document.getElementById("subtaskList").appendChild(renderSubtaskItem(t.id, s));
+    input.value = "";
+    render();
+  });
+
+  // エクスポート／インポート
+  document.getElementById("btnExport").addEventListener("click", ()=>{
+    const blob = new Blob([JSON.stringify(tasks,null,2)], { type: "application/json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "tasks.json";
+    a.click();
+    URL.revokeObjectURL(a.href);
+  });
+  document.getElementById("btnImport").addEventListener("click", ()=>{
+    document.getElementById("importFile").click();
+  });
+  document.getElementById("importFile").addEventListener("change", (ev)=>{
+    const file = ev.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ()=>{
+      try {
+        const data = JSON.parse(reader.result);
+        if (!Array.isArray(data)) throw new Error("invalid");
+        tasks = data;
+        save();
+        render();
+      } catch(e) {
+        alert("不正なJSONです");
+      }
+    };
+    reader.readAsText(file);
+    ev.target.value = "";
+  });
+
+  // dialog 背景クリックで閉じないように（ブラウザ実装依存対策）
+  document.getElementById("taskModal").addEventListener("click", (e)=>{
+    const rect = taskModal.getBoundingClientRect();
+    const inDialog =
+      (e.clientX >= rect.left && e.clientX <= rect.right &&
+       e.clientY >= rect.top  && e.clientY <= rect.bottom);
+    if (!inDialog) e.preventDefault();
+  });
+
+  // ------------------------------
+  // 初期化
+  // ------------------------------
+  load();
+  render();
+  setupDnD();
+  </script>
+</body>
+</html>

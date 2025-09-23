@@ -3,3 +3,4 @@
 **/skyway/dist/*
 **/skyway/.parcel-cache/*
 **/*.key
+.DS_Store
