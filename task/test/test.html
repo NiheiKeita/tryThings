@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>ブラウザでCSV直接編集＆上書き保存</title>
+<style>
+  body { font-family: system-ui, sans-serif; margin: 24px; }
+  .toolbar { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+  button { padding: 8px 12px; }
+  table { border-collapse: collapse; width: 100%; }
+  th, td { border: 1px solid #ccc; padding: 6px 8px; min-width: 80px; }
+  td[contenteditable="true"] { background: #fffdfa; }
+  th { background: #f4f4f4; }
+  .hint { color:#666; font-size:12px; margin-top:8px; }
+</style>
+</head>
+<body>
+<h1>CSVを直接編集して上書き保存</h1>
+<div class="toolbar">
+  <button id="openBtn">CSVを開く</button>
+  <button id="saveBtn" disabled>上書き保存</button>
+  <span id="fileName" style="margin-left:8px;color:#555;"></span>
+</div>
+<div id="tableWrap"></div>
+<p class="hint">
+  ※ Chrome/Edge デスクトップで動作します（file:// OK）。Safari/Firefoxは未対応。<br>
+  ※ 権限ダイアログが出たら「許可」してください。
+</p>
+
+<script>
+let fileHandle = null;
+let aoa = []; // Array of Arrays
+
+const $tableWrap = document.getElementById('tableWrap');
+const $fileName = document.getElementById('fileName');
+
+function renderTable() {
+  $tableWrap.innerHTML = "";
+  const table = document.createElement("table");
+  aoa.forEach((row, r) => {
+    const tr = document.createElement("tr");
+    row.forEach((val, c) => {
+      const cell = r === 0 ? document.createElement("th") : document.createElement("td");
+      cell.contentEditable = r > 0 ? "true" : "false";
+      cell.textContent = val ?? "";
+      if (r > 0) cell.addEventListener("input", () => { aoa[r][c] = cell.textContent; });
+      tr.appendChild(cell);
+    });
+    table.appendChild(tr);
+  });
+  $tableWrap.appendChild(table);
+}
+
+function csvToAoa(text) {
+  return text.split(/\r?\n/).filter(line=>line!=="").map(line=>{
+    const result=[]; let cur=""; let inQ=false;
+    for (let i=0;i<line.length;i++){
+      const ch=line[i];
+      if(inQ){
+        if(ch==='"'){ if(line[i+1]==='"'){cur+='"';i++;} else inQ=false;}
+        else cur+=ch;
+      } else {
+        if(ch===','){ result.push(cur); cur=""; }
+        else if(ch==='"') inQ=true;
+        else cur+=ch;
+      }
+    }
+    result.push(cur);
+    return result;
+  });
+}
+
+function aoaToCsv(data) {
+  return data.map(row => row.map(v=>{
+    const s=(v??"").toString();
+    return /[",\n]/.test(s) ? `"${s.replace(/"/g,'""')}"` : s;
+  }).join(",")).join("\n");
+}
+
+async function readPickedFile(handle) {
+  const file = await handle.getFile();
+  $fileName.textContent = file.name;
+  const text = await file.text();
+  aoa = csvToAoa(text);
+  renderTable();
+}
+
+async function writeBack(handle) {
+  const writable = await handle.createWritable();
+  await writable.write(aoaToCsv(aoa));
+  await writable.close();
+}
+
+document.getElementById('openBtn').addEventListener('click', async () => {
+  if (!window.showOpenFilePicker) {
+    alert('Chrome/Edgeのみ対応です');
+    return;
+  }
+  const [handle] = await window.showOpenFilePicker({
+    types: [{ description: "CSV", accept: { "text/csv": [".csv"] } }]
+  });
+  fileHandle = handle;
+  await readPickedFile(fileHandle);
+  document.getElementById('saveBtn').disabled = false;
+});
+
+document.getElementById('saveBtn').addEventListener('click', async () => {
+  const perm = await fileHandle.requestPermission({ mode: "readwrite" });
+  if (perm !== "granted") return alert("書き込みが許可されませんでした");
+  await writeBack(fileHandle);
+  alert("上書き保存しました！");
+});
+</script>
+</body>
+</html>
