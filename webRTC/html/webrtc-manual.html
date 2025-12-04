@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>Manual WebRTC (No Signaling Server)</title>
+  <style>
+    body { font-family: sans-serif; }
+    video { width: 45%; background: #000; }
+    #videos { display: flex; gap: 8px; margin-bottom: 8px; }
+    textarea { width: 100%; height: 120px; }
+    button { margin: 4px 0; }
+  </style>
+</head>
+<body>
+  <h1>Manual WebRTC (copy & paste SDP)</h1>
+
+  <div id="videos">
+    <div>
+      <div>Local</div>
+      <video id="localVideo" autoplay muted></video>
+    </div>
+    <div>
+      <div>Remote</div>
+      <video id="remoteVideo" autoplay></video>
+    </div>
+  </div>
+
+  <h2>Local SDP (これを相手に渡す)</h2>
+  <textarea id="localSdp"></textarea>
+
+  <h2>Remote SDP (相手からもらったものを貼る)</h2>
+  <textarea id="remoteSdp"></textarea>
+
+  <div>
+    <button id="btnCaller">① Callerとして開始（A側）</button><br />
+    <button id="btnSetOfferCreateAnswer">② OfferをセットしてAnswer作成（B側）</button><br />
+    <button id="btnSetAnswer">③ Answerをセット（A側）</button>
+  </div>
+
+  <script>
+    let pc;
+    let localStream;
+
+    async function setupPeerConnection() {
+      pc = new RTCPeerConnection({
+        iceServers: [] // ローカルネットワークだけならSTUNなしでOK
+      });
+
+      pc.ontrack = (event) => {
+        console.log("ontrack", event.streams);
+        const remoteVideo = document.getElementById("remoteVideo");
+        remoteVideo.srcObject = event.streams[0];
+      };
+
+      pc.onicegatheringstatechange = () => {
+        console.log("iceGatheringState:", pc.iceGatheringState);
+        // ICE収集が完了したら localDescription に candidate 込みのSDPが入る
+        if (pc.iceGatheringState === "complete") {
+          const localSdp = document.getElementById("localSdp");
+          localSdp.value = JSON.stringify(pc.localDescription);
+        }
+      };
+
+      // ローカルメディア取得（カメラ・マイク）
+      localStream = await navigator.mediaDevices.getUserMedia({
+        video: true,
+        audio: true,
+      });
+
+      const localVideo = document.getElementById("localVideo");
+      localVideo.srcObject = localStream;
+
+      localStream.getTracks().forEach((track) => {
+        pc.addTrack(track, localStream);
+      });
+    }
+
+    // A側：Callerとして開始
+    document.getElementById("btnCaller").onclick = async () => {
+      await setupPeerConnection();
+
+      // Offer作成 → setLocalDescription
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+
+      // ICE candidate が集まりきると onicegatheringstatechange 内で localSDP に反映される
+      // ここでは何もせず、状態が complete になるのを待つ
+      alert("少し待ってから Local SDP をコピーして B に渡してください");
+    };
+
+    // B側：Offerを受け取ってAnswer作成
+    document.getElementById("btnSetOfferCreateAnswer").onclick = async () => {
+      await setupPeerConnection();
+
+      const remoteSdpText = document.getElementById("remoteSdp").value;
+      if (!remoteSdpText) {
+        alert("Remote SDP に A からもらった SDP を貼り付けてください");
+        return;
+      }
+
+      const remoteDesc = JSON.parse(remoteSdpText);
+      await pc.setRemoteDescription(remoteDesc);
+
+      const answer = await pc.createAnswer();
+      await pc.setLocalDescription(answer);
+
+      alert("少し待ってから Local SDP をコピーして A に渡してください（これが Answer）");
+    };
+
+    // A側：Answerをセット
+    document.getElementById("btnSetAnswer").onclick = async () => {
+      const remoteSdpText = document.getElementById("remoteSdp").value;
+      if (!remoteSdpText) {
+        alert("Remote SDP に B からもらった Answer SDP を貼り付けてください");
+        return;
+      }
+
+      const remoteDesc = JSON.parse(remoteSdpText);
+      await pc.setRemoteDescription(remoteDesc);
+
+      alert("接続待ち…数秒で相手の映像/音声が入ってくるはずです");
+    };
+  </script>
+</body>
+</html>
