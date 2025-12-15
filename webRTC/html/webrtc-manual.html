@@ -60,6 +60,14 @@
           localSdp.value = JSON.stringify(pc.localDescription);
         }
       };
+      pc.onicecandidate = (event) => {
+        if (event.candidate) {
+          console.log("type:", event.candidate.type); // host / srflx / relay
+          console.log("protocol:", event.candidate.protocol); // udp / tcp
+        } else {
+          console.log("ICE gathering complete");
+        }
+      };
 
       // ローカルメディア取得（カメラ・マイク）
       localStream = await navigator.mediaDevices.getUserMedia({
